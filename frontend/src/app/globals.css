@@ -1,0 +1,357 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-primary: #3B82F6;
+  --color-primary-dark: #2563EB;
+  --color-primary-light: #60A5FA;
+  --color-accent: #00D4AA;
+  --color-accent-dark: #00B893;
+  --color-accent-light: #33DFBB;
+  --color-teal: #00D4AA;
+  --color-teal-dark: #00B893;
+  --color-teal-light: #33DFBB;
+  --color-orange: #F97316;
+  --color-orange-dark: #EA580C;
+  --color-orange-light: #FB923C;
+  --color-background: #F8FAFC;
+  --color-foreground: #0F172A;
+  --color-surface: #FFFFFF;
+  --color-surface-hover: #F1F5F9;
+  --color-border: #E2E8F0;
+  --color-muted: #64748B;
+  --color-card: #FFFFFF;
+  --color-elevated: #FFFFFF;
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* ─── Light Mode ─────────────────────────────── */
+:root {
+  --bg: #F8FAFC;
+  --fg: #0F172A;
+  --fg-secondary: #334155;
+  --surf: #FFFFFF;
+  --surf-h: #F1F5F9;
+  --brd: #E2E8F0;
+  --brd-subtle: rgba(0, 0, 0, 0.06);
+  --mut: #64748B;
+  --crd: #FFFFFF;
+  --elev: #FFFFFF;
+  --accent: #00D4AA;
+  --accent-glow: rgba(0, 212, 170, 0.15);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-card-hover: 0 10px 40px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow-mega: 0 20px 60px rgba(0, 0, 0, 0.15), 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+/* ─── Dark Mode (Premium Layered Palette) ────── */
+.dark {
+  --bg: #0B0F19;
+  --fg: #E2E8F0;
+  --fg-secondary: #CBD5E1;
+  --surf: #151B28;
+  --surf-h: #1C2333;
+  --brd: rgba(255, 255, 255, 0.08);
+  --brd-subtle: rgba(255, 255, 255, 0.04);
+  --mut: #94A3B8;
+  --crd: #151B28;
+  --elev: #1C2333;
+  --accent: #00D4AA;
+  --accent-glow: rgba(0, 212, 170, 0.12);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-card-hover: 0 10px 40px rgba(0, 0, 0, 0.4), 0 4px 16px rgba(0, 0, 0, 0.2);
+  --shadow-mega: 0 20px 60px rgba(0, 0, 0, 0.5), 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+/* Override Tailwind theme tokens in dark mode */
+.dark {
+  --tw-color-background: #0B0F19;
+  --tw-color-foreground: #E2E8F0;
+  --tw-color-surface: #151B28;
+  --tw-color-surface-hover: #1C2333;
+  --tw-color-border: rgba(255, 255, 255, 0.08);
+  --tw-color-muted: #94A3B8;
+  --tw-color-card: #151B28;
+  --tw-color-elevated: #1C2333;
+}
+
+/* ─── Scrollbar ──────────────────────────────── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--mut) transparent;
+}
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--mut); border-radius: 3px; opacity: 0.5; }
+.dark ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.3); }
+
+/* ─── Base ───────────────────────────────────── */
+html {
+  transition: background-color 0.4s ease, color 0.3s ease;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  transition: background-color 0.4s ease, color 0.3s ease;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Gradient Text ──────────────────────────── */
+.gradient-text {
+  background: linear-gradient(135deg, #3B82F6, #00D4AA);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gradient-text-accent {
+  background: linear-gradient(135deg, #00D4AA, #3B82F6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ─── Glass Effect ───────────────────────────── */
+.glass {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.dark .glass {
+  background: rgba(21, 27, 40, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* ─── Card System ────────────────────────────── */
+.card-base {
+  background: var(--crd);
+  border: 1px solid var(--brd);
+  border-radius: 1rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: var(--shadow-card);
+}
+
+.card-base:hover {
+  box-shadow: var(--shadow-card-hover);
+  transform: translateY(-2px);
+}
+
+.dark .card-base:hover {
+  border-color: rgba(0, 212, 170, 0.15);
+}
+
+/* ─── Mega Menu ──────────────────────────────── */
+.mega-menu {
+  background: var(--elev);
+  border: 1px solid var(--brd);
+  box-shadow: var(--shadow-mega);
+  border-radius: 1rem;
+}
+
+.dark .mega-menu {
+  background: #1C2333;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.mega-menu-item {
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.mega-menu-item:hover {
+  background: var(--surf-h);
+}
+
+.dark .mega-menu-item:hover {
+  background: rgba(0, 212, 170, 0.06);
+}
+
+/* ─── Image Overlay (Dark Mode) ──────────────── */
+.dark .img-dark-overlay {
+  position: relative;
+}
+
+.dark .img-dark-overlay::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle, rgba(11, 15, 25, 0) 50%, rgba(11, 15, 25, 0.3) 100%), linear-gradient(180deg, rgba(11, 15, 25, 0.1) 0%, rgba(11, 15, 25, 0.5) 100%);
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* ─── Skeleton Loading ───────────────────────── */
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--surf-h) 25%, var(--brd) 50%, var(--surf-h) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  border-radius: 0.5rem;
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.dark .skeleton {
+  background: linear-gradient(90deg, #1C2333 25%, #252D3F 50%, #1C2333 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
+/* ─── Breadcrumbs ────────────────────────────── */
+.breadcrumb-link {
+  color: var(--mut);
+  font-size: 0.875rem;
+  transition: color 0.2s ease;
+}
+
+.breadcrumb-link:hover {
+  color: var(--accent);
+}
+
+.breadcrumb-separator {
+  color: var(--mut);
+  opacity: 0.5;
+  margin: 0 0.5rem;
+  font-size: 0.75rem;
+}
+
+/* ─── Accent Glow Effects ────────────────────── */
+.glow-accent {
+  box-shadow: 0 0 20px var(--accent-glow);
+}
+
+.hover-glow:hover {
+  box-shadow: 0 0 20px var(--accent-glow), 0 8px 32px rgba(0, 0, 0, 0.12);
+}
+
+.dark .hover-glow:hover {
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4), 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+/* ─── Focus States (Accessibility) ───────────── */
+*:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ─── Minimum Tap Targets ────────────────────── */
+.tap-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* ─── Animations ─────────────────────────────── */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+.animate-float { animation: float 3s ease-in-out infinite; }
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in-up { animation: fade-in-up 0.6s ease-out forwards; }
+
+@keyframes spin-sun-moon {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Theme toggle animation */
+.theme-toggle-icon {
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+}
+
+/* ─── Pill / Chip Styles ─────────────────────── */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.pill-accent {
+  background: rgba(0, 212, 170, 0.1);
+  color: #00D4AA;
+}
+
+.pill-accent:hover {
+  background: rgba(0, 212, 170, 0.2);
+}
+
+/* ─── Sentiment Badges ───────────────────────── */
+.sentiment-positive {
+  background: rgba(0, 212, 170, 0.1);
+  color: #00D4AA;
+}
+
+.sentiment-neutral {
+  background: rgba(148, 163, 184, 0.15);
+  color: #94A3B8;
+}
+
+.sentiment-negative {
+  background: rgba(239, 68, 68, 0.1);
+  color: #EF4444;
+}
+
+/* ─── Count-up Animation ─────────────────────── */
+@keyframes count-up-bar {
+  from { width: 0%; }
+  to { width: 100%; }
+}
+
+/* ─── Accordion (Mobile Nav) ─────────────────── */
+.accordion-content {
+  overflow: hidden;
+  transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ─── Compare Float Button ───────────────────── */
+.compare-float {
+  position: fixed;
+  bottom: 6rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  background: linear-gradient(135deg, #3B82F6, #00D4AA);
+  color: white;
+  padding: 0.75rem 2rem;
+  border-radius: 9999px;
+  font-weight: 600;
+  box-shadow: 0 8px 32px rgba(0, 212, 170, 0.3);
+  transition: all 0.3s ease;
+}
+
+.compare-float:hover {
+  transform: translateX(-50%) translateY(-2px);
+  box-shadow: 0 12px 40px rgba(0, 212, 170, 0.4);
+}
