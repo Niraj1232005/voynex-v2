@@ -23,8 +23,8 @@ function mapBackendUser(bUser: any): User {
   }
 
   return {
-    _id: bUser.id,
-    name: `${bUser.firstName || ''} ${bUser.lastName || ''}`.trim() || bUser.email.split('@')[0],
+    _id: bUser.id || bUser._id || bUser.sub,
+    name: `${bUser.firstName || ''} ${bUser.lastName || ''}`.trim() || bUser.email?.split('@')?.[0] || 'User',
     email: bUser.email,
     role,
     organization_id: bUser.organizationId,
@@ -40,8 +40,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Check if user is logged in on mount
     api.get('/auth/me')
       .then(res => {
-        if (res && res.id) {
-          setUser(mapBackendUser(res));
+        const u = res?.user || res;
+        if (u && (u.id || u._id || u.sub)) {
+          setUser(mapBackendUser(u));
+        } else {
+          setUser(null);
         }
       })
       .catch(() => {
@@ -57,7 +60,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     try {
       const res = await api.post('/auth/login', { email, password });
-      const mapped = mapBackendUser(res.user);
+      const token = res?.access_token || res?.token;
+      if (token && typeof window !== 'undefined') {
+        localStorage.setItem('voynex_token', token);
+      }
+      const u = res?.user || res;
+      const mapped = mapBackendUser(u);
       setUser(mapped);
       setLoading(false);
       return mapped;
@@ -90,7 +98,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Log in automatically after registration
       const loginRes = await api.post('/auth/login', { email, password });
-      setUser(mapBackendUser(loginRes.user));
+      const token = loginRes?.access_token || loginRes?.token;
+      if (token && typeof window !== 'undefined') {
+        localStorage.setItem('voynex_token', token);
+      }
+      setUser(mapBackendUser(loginRes?.user || loginRes));
       setLoading(false);
     } catch (err) {
       setLoading(false);
@@ -100,6 +112,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     setUser(null);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('voynex_token');
+    }
     try {
       await api.post('/auth/logout');
     } catch (err) {

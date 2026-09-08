@@ -10,6 +10,13 @@ async function request(path: string, options: RequestInit = {}) {
     }
   }
 
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('voynex_token');
+    if (token && !headers.has('Authorization')) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
+  }
+
   const mergedOptions: RequestInit = {
     ...options,
     headers,

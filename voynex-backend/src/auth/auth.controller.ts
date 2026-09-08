@@ -18,6 +18,8 @@ import { RolesGuard } from './roles.guard';
 import { Throttle } from '@nestjs/throttler';
 import { IsEmail, IsNotEmpty, IsString } from 'class-validator';
 
+import { UsersService } from '../users/users.service';
+
 export class LoginDto {
   @IsEmail()
   @IsNotEmpty()
@@ -33,9 +35,10 @@ export class AuthController {
   constructor(
     private authService: AuthService,
     private jwtService: JwtService,
+    private usersService: UsersService,
   ) {}
 
-  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   @Post('login')
   async login(
@@ -65,8 +68,11 @@ export class AuthController {
 
     return {
       message: 'Login successful',
+      access_token: token,
+      token,
       user: {
         id: user.id,
+        _id: user.id,
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
@@ -78,10 +84,23 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
-  getMe(@Req() req: Request) {
+  async getMe(@Req() req: Request) {
+    const userId = (req.user as any)?.sub;
+    const user = userId ? await this.usersService.findById(userId) : null;
     return {
       message: 'Current user fetched successfully',
-      user: req.user,
+      id: user ? user.id : (req.user as any)?.sub,
+      user: user
+        ? {
+            id: user.id,
+            _id: user.id,
+            email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            role: user.role,
+            organizationId: user.organizationId,
+          }
+        : req.user,
     };
   }
 

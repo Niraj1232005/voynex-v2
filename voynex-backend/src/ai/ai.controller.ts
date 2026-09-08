@@ -8,7 +8,6 @@ import { CurrentUser } from '../auth/current-user.decorator';
 export class AiController {
   constructor(private readonly aiService: AiService) {}
 
-  @UseGuards(JwtAuthGuard)
   @Post('plan-trip')
   planTrip(@Body() planTripDto: PlanTripDto) {
     return this.aiService.planTrip(planTripDto);

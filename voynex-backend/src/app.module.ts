@@ -15,7 +15,6 @@ import { BookingsModule } from './bookings/bookings.module';
 import { PaymentsModule } from './payments/payments.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { EmailModule } from './email/email.module';
-import { BullModule } from '@nestjs/bull';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AdminModule } from './admin/admin.module';
 import { RentalsModule } from './rentals/rentals.module';
@@ -29,7 +28,7 @@ import { ShopModule } from './shop/shop.module';
     ThrottlerModule.forRoot([
       {
         ttl: 60000,
-        limit: 10,
+        limit: 300,
       },
     ]),
 
@@ -41,7 +40,7 @@ import { ShopModule } from './shop/shop.module';
         synchronize: process.env.DB_SYNCHRONIZE === 'true',
         migrations: [__dirname + '/migrations/*{.ts,.js}'],
         migrationsRun: process.env.DB_MIGRATIONS_RUN === 'true',
-        logging: true,
+        logging: false,
       }),
     }),
     UsersModule,
@@ -58,12 +57,6 @@ import { ShopModule } from './shop/shop.module';
     RentalsModule,
     WishlistModule,
     ShopModule,
-    BullModule.forRoot({
-      redis: {
-        host: process.env.REDIS_HOST,
-        port: Number(process.env.REDIS_PORT),
-      },
-    }),
   ],
   controllers: [AppController],
   providers: [
