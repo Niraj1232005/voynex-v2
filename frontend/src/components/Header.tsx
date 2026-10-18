@@ -7,7 +7,8 @@ import { useCart } from '@/contexts/CartContext';
 import {
   TbSun, TbMoon, TbMenu2, TbX, TbShoppingCart, TbUser, TbLogout, TbChevronDown, TbChevronRight,
   TbCompass, TbMap, TbMapPin, TbCar, TbCpu, TbPackage, TbMessageCircle,
-  TbShoppingBag, TbHeart, TbCalendar, TbSettings, TbUserPlus, TbGridDots, TbHome, TbCrown, TbReceipt, TbSearch
+  TbShoppingBag, TbHeart, TbCalendar, TbSettings, TbUserPlus, TbGridDots, TbHome, TbCrown, TbReceipt, TbSearch,
+  TbClock
 } from 'react-icons/tb';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -53,6 +54,7 @@ export default function Header() {
         href: '/plan',
         children: [
           { href: '/ai-planner', label: 'AI Planner', description: 'Generate personalized itineraries', icon: TbCpu },
+          { href: '/freetime', label: 'Free-Time Finder', description: 'Nearby spots during layovers & station gaps', icon: TbClock },
           { href: '/packing-assistant', label: 'Smart Packing', description: 'AI-powered packing checklists', icon: TbPackage },
           { href: '/chat', label: 'AI Chatbot', description: 'Chat with our AI travel expert', icon: TbMessageCircle },
         ],

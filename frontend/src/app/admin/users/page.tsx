@@ -1,13 +1,19 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { FiUsers, FiSearch, FiEdit, FiTrash2, FiUserCheck, FiUserX } from 'react-icons/fi';
+import { motion, AnimatePresence } from 'framer-motion';
+import { FiUsers, FiSearch, FiEdit, FiTrash2, FiUserCheck, FiUserX, FiX } from 'react-icons/fi';
 import { api } from '@/lib/api';
+import { useToast } from '@/contexts/ToastContext';
 
 export default function AdminUsersPage() {
-  const [search, setSearch] = useState('');
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [editingUser, setEditingUser] = useState<any | null>(null);
+  const [editFirstName, setEditFirstName] = useState('');
+  const [editLastName, setEditLastName] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
+  const { showToast } = useToast();
 
   useEffect(() => {
     fetchUsers();
@@ -16,22 +22,21 @@ export default function AdminUsersPage() {
   const fetchUsers = () => {
     setLoading(true);
     api.get('/admin/users')
-      .then(res => {
+      .then((res: any) => {
         const dataArray = res && res.data ? res.data : Array.isArray(res) ? res : [];
-        const mapped = dataArray.map((u: any) => ({
-          id: u.id,
-          firstName: u.firstName,
-          lastName: u.lastName,
-          name: `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email.split('@')[0],
+        setUsers(dataArray.map((u: any) => ({
+          id: u._id || u.id,
+          name: `${u.firstName || ''} ${u.lastName || ''}`.trim() || 'Anonymous',
+          firstName: u.firstName || '',
+          lastName: u.lastName || '',
           email: u.email,
-          role: u.role || 'user',
-          joined: new Date(u.createdAt).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }),
-          isActive: u.isActive !== false,
-        }));
-        setUsers(mapped);
+          role: u.role || 'TRAVELER',
+          joined: new Date(u.createdAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' }),
+          isActive: u.isActive !== undefined ? u.isActive : true,
+        })));
       })
       .catch(err => {
-        console.error('Error loading global admin users:', err);
+        console.error('Error fetching admin users:', err);
       })
       .finally(() => {
         setLoading(false);
@@ -40,36 +45,42 @@ export default function AdminUsersPage() {
 
   const handleToggleStatus = (id: string, currentIsActive: boolean) => {
     const actionText = currentIsActive ? 'suspend' : 'activate';
-    if (!confirm(`Are you sure you want to ${actionText} this user?`)) return;
-
     api.patch(`/admin/users/${id}/suspend`, { isActive: !currentIsActive })
       .then(() => {
         setUsers(prev => prev.map(u => u.id === id ? { ...u, isActive: !currentIsActive } : u));
+        showToast(`User successfully ${currentIsActive ? 'suspended' : 'activated'}`, 'info');
       })
-      .catch(err => alert(err.message || `Failed to ${actionText} user`));
+      .catch(err => showToast(err.message || `Failed to ${actionText} user`, 'error'));
   };
 
   const handleDeleteUser = (id: string, email: string) => {
-    if (!confirm(`Are you sure you want to permanently delete user ${email}? This action cannot be undone.`)) return;
-
     api.delete(`/admin/users/${id}`)
       .then(() => {
         setUsers(prev => prev.filter(u => u.id !== id));
+        showToast(`User ${email} deleted`, 'info');
       })
-      .catch(err => alert(err.message || 'Failed to delete user'));
+      .catch(err => showToast(err.message || 'Failed to delete user', 'error'));
   };
 
-  const handleEditUser = (user: any) => {
-    const newFirstName = prompt('Enter new First Name:', user.firstName || '');
-    if (newFirstName === null) return;
-    const newLastName = prompt('Enter new Last Name:', user.lastName || '');
-    if (newLastName === null) return;
+  const handleOpenEdit = (user: any) => {
+    setEditingUser(user);
+    setEditFirstName(user.firstName || '');
+    setEditLastName(user.lastName || '');
+  };
 
-    api.patch('/users/profile', { firstName: newFirstName, lastName: newLastName })
+  const handleSaveEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser) return;
+    setEditSaving(true);
+
+    api.patch('/users/profile', { firstName: editFirstName, lastName: editLastName })
       .then(() => {
+        showToast('User profile updated successfully!', 'success');
+        setEditingUser(null);
         fetchUsers();
       })
-      .catch(err => alert(err.message || 'Failed to update user profile'));
+      .catch(err => showToast(err.message || 'Failed to update user profile', 'error'))
+      .finally(() => setEditSaving(false));
   };
 
   const filteredUsers = users.filter(u => 
@@ -140,7 +151,7 @@ export default function AdminUsersPage() {
                   </td>
                   <td className="p-4 flex gap-2 justify-end">
                     <button 
-                      onClick={() => handleEditUser(u)} 
+                      onClick={() => handleOpenEdit(u)} 
                       title="Edit User Profile"
                       className="p-1.5 text-muted hover:text-primary rounded-lg hover:bg-primary/10 transition-colors"
                     >
@@ -169,6 +180,81 @@ export default function AdminUsersPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Edit User Modal */}
+      <AnimatePresence>
+        {editingUser && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setEditingUser(null)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="relative w-full max-w-md bg-card border border-border rounded-2xl p-6 shadow-2xl z-10"
+            >
+              <div className="flex items-center justify-between pb-4 border-b border-border">
+                <h3 className="text-lg font-bold text-foreground">Edit User Profile</h3>
+                <button
+                  onClick={() => setEditingUser(null)}
+                  className="p-1.5 rounded-lg text-muted hover:text-foreground hover:bg-surface-hover transition-colors"
+                >
+                  <FiX size={18} />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveEdit} className="mt-4 space-y-4">
+                <div>
+                  <label className="text-xs font-semibold text-muted uppercase tracking-wider block mb-1.5">First Name</label>
+                  <input
+                    type="text"
+                    value={editFirstName}
+                    onChange={(e) => setEditFirstName(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-border bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    placeholder="First Name"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-muted uppercase tracking-wider block mb-1.5">Last Name</label>
+                  <input
+                    type="text"
+                    value={editLastName}
+                    onChange={(e) => setEditLastName(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-border bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    placeholder="Last Name"
+                  />
+                </div>
+                <div className="text-xs text-muted">
+                  Email: <span className="font-mono text-foreground">{editingUser.email}</span>
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
+                  <button
+                    type="button"
+                    onClick={() => setEditingUser(null)}
+                    className="px-4 py-2 text-sm font-medium text-muted hover:text-foreground rounded-xl hover:bg-surface-hover transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={editSaving}
+                    className="px-5 py-2 text-sm font-semibold text-white bg-primary hover:bg-primary-hover rounded-xl shadow-md shadow-primary/20 transition-all disabled:opacity-50"
+                  >
+                    {editSaving ? 'Saving...' : 'Save Changes'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

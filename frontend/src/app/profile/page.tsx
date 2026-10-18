@@ -6,6 +6,8 @@ import Breadcrumbs from '@/components/Breadcrumbs';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { api } from '@/lib/api';
 
+import { useToast } from '@/contexts/ToastContext';
+
 function ProfileContent() {
   const [profile, setProfile] = useState<any>(null);
   const [firstName, setFirstName] = useState('');
@@ -14,6 +16,7 @@ function ProfileContent() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
+  const { showToast } = useToast();
 
   useEffect(() => {
     api.get('/users/profile')
@@ -36,9 +39,10 @@ function ProfileContent() {
       .then(res => {
         setProfile(res);
         setSuccessMsg('Profile updated successfully!');
+        showToast('Profile updated successfully!', 'success');
         setTimeout(() => setSuccessMsg(''), 3000);
       })
-      .catch(err => alert(err.message || 'Failed to update profile'))
+      .catch(err => showToast(err.message || 'Failed to update profile', 'error'))
       .finally(() => setSaving(false));
   };
 

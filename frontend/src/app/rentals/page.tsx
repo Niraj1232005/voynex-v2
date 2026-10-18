@@ -7,6 +7,8 @@ import { api } from '@/lib/api';
 
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/contexts/ToastContext';
+import RentalDurationModal from '@/components/RentalDurationModal';
 
 const CATEGORIES = ['all', 'gear', 'vehicle', 'electronics', 'apparel'];
 const typeEmoji: Record<string, string> = { gear: '🎒', vehicle: '🏍️', electronics: '📷', apparel: '🧥' };
@@ -33,6 +35,9 @@ export default function RentalsPage() {
   const [loading, setLoading] = useState(true);
   const [submittingId, setSubmittingId] = useState<string | null>(null);
 
+  const { showToast } = useToast();
+  const [selectedRentalForModal, setSelectedRentalForModal] = useState<any | null>(null);
+
   useEffect(() => {
     fetchRentals();
     loadRazorpayScript();
@@ -53,20 +58,19 @@ export default function RentalsPage() {
       .finally(() => setLoading(false));
   };
 
-  const handleRentNow = async (rental: any) => {
+  const handleRentNow = (rental: any) => {
     if (!isAuthenticated) {
+      showToast('Please sign in to rent gear', 'info');
       router.push('/login');
       return;
     }
+    setSelectedRentalForModal(rental);
+  };
 
+  const handleConfirmRental = async (daysCount: number) => {
+    if (!selectedRentalForModal) return;
+    const rental = selectedRentalForModal;
     const rentalId = rental._id || rental.id;
-    const inputDays = prompt(`Enter rental duration in days for "${rental.title || rental.name}":`, '3');
-    if (!inputDays) return;
-    const daysCount = parseInt(inputDays, 10);
-    if (isNaN(daysCount) || daysCount < 1) {
-      alert('Please enter a valid number of days (1 or more).');
-      return;
-    }
 
     setSubmittingId(rentalId);
 
@@ -80,10 +84,13 @@ export default function RentalsPage() {
 
       const isScriptLoaded = await loadRazorpayScript();
       if (!isScriptLoaded) {
-        alert('Razorpay SDK failed to load. Please check your internet connection.');
+        showToast('Payment gateway failed to load. Please check your internet connection.', 'error');
         setSubmittingId(null);
         return;
       }
+
+      // Close duration modal now that checkout is starting
+      setSelectedRentalForModal(null);
 
       // 3. Open Razorpay Checkout Modal
       const options = {
@@ -98,7 +105,7 @@ export default function RentalsPage() {
           email: user?.email || 'traveler@voynex.com',
         },
         theme: {
-          color: '#6366f1',
+          color: '#0d9488',
         },
         handler: async function (response: any) {
           try {
@@ -108,9 +115,10 @@ export default function RentalsPage() {
               razorpay_signature: response.razorpay_signature,
             });
 
+            showToast('Rental booking confirmed!', 'success');
             router.push(`/booking-success?bookingId=${realBookingId}&destination=${encodeURIComponent(rental.title || 'Rental Gear')}`);
           } catch (err: any) {
-            alert(err.message || 'Payment verification failed.');
+            showToast(err.message || 'Payment verification failed.', 'error');
           } finally {
             setSubmittingId(null);
           }
@@ -124,12 +132,12 @@ export default function RentalsPage() {
 
       const rzp = new (window as any).Razorpay(options);
       rzp.on('payment.failed', function (resp: any) {
-        alert(resp.error?.description || 'Payment failed.');
+        showToast(resp.error?.description || 'Payment failed.', 'error');
         setSubmittingId(null);
       });
       rzp.open();
     } catch (err: any) {
-      alert(err.message || 'Failed to initiate rental booking.');
+      showToast(err.message || 'Failed to initiate rental booking.', 'error');
       setSubmittingId(null);
     }
   };
@@ -218,6 +226,14 @@ export default function RentalsPage() {
           </div>
         )}
       </div>
+
+      <RentalDurationModal
+        isOpen={!!selectedRentalForModal}
+        rental={selectedRentalForModal}
+        onClose={() => setSelectedRentalForModal(null)}
+        onConfirm={handleConfirmRental}
+        isSubmitting={!!submittingId}
+      />
     </div>
   );
 }

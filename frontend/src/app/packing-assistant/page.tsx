@@ -4,6 +4,8 @@ import { motion } from 'framer-motion';
 import { FiCpu, FiCheck, FiDownload, FiRotateCcw } from 'react-icons/fi';
 import { PackingItem } from '@/types';
 import Breadcrumbs from '@/components/Breadcrumbs';
+import { generatePackingListPDF } from '@/lib/pdfGenerator';
+import { useToast } from '@/contexts/ToastContext';
 
 function generatePackingList(destination: string, activities: string[], duration: number): PackingItem[] {
   const items: PackingItem[] = [];
@@ -52,23 +54,23 @@ export default function PackingAssistantPage() {
     setLoading(false);
   };
 
+  const { showToast } = useToast();
   const toggleItem = (id: string) => setPackingList(prev => prev.map(i => i.id === id ? { ...i, checked: !i.checked } : i));
   const checkedCount = packingList.filter(i => i.checked).length;
   const categories = [...new Set(packingList.map(i => i.category))];
 
   const downloadPDF = () => {
-    let content = `VOYNEX Packing Checklist\n${'='.repeat(40)}\nDestination: ${destination}\nDuration: ${duration} days\nActivities: ${selectedActivities.join(', ')}\n\n`;
-    categories.forEach(cat => {
-      content += `\n${cat}\n${'-'.repeat(30)}\n`;
-      packingList.filter(i => i.category === cat).forEach(i => {
-        content += `${i.checked ? '[✓]' : '[ ]'} ${i.item}\n`;
+    try {
+      generatePackingListPDF({
+        destination,
+        duration,
+        activities: selectedActivities,
+        items: packingList,
       });
-    });
-    const blob = new Blob([content], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = `voynex-packing-${destination.toLowerCase()}.txt`;
-    a.click(); URL.revokeObjectURL(url);
+      showToast('Packing checklist PDF downloaded!', 'success');
+    } catch (err: any) {
+      showToast('Failed to generate checklist PDF. Please try again.', 'error');
+    }
   };
 
   return (

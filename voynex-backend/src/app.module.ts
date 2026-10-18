@@ -20,6 +20,7 @@ import { AdminModule } from './admin/admin.module';
 import { RentalsModule } from './rentals/rentals.module';
 import { WishlistModule } from './wishlist/wishlist.module';
 import { ShopModule } from './shop/shop.module';
+import { FreetimeModule } from './freetime/freetime.module';
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { ShopModule } from './shop/shop.module';
     RentalsModule,
     WishlistModule,
     ShopModule,
+    FreetimeModule,
   ],
   controllers: [AppController],
   providers: [

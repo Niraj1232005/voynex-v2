@@ -9,6 +9,7 @@ import { api } from '@/lib/api';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
+import { useToast } from '@/contexts/ToastContext';
 
 const loadRazorpayScript = (): Promise<boolean> => {
   return new Promise((resolve) => {
@@ -28,6 +29,7 @@ export default function CartPage() {
   const { items, updateQuantity, removeFromCart, clearCart, totalPrice, totalItems } = useCart();
   const { isAuthenticated, user } = useAuth();
   const router = useRouter();
+  const { showToast } = useToast();
   const [submitting, setSubmitting] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState<any>(null);
 
@@ -56,7 +58,7 @@ export default function CartPage() {
 
       const isScriptLoaded = await loadRazorpayScript();
       if (!isScriptLoaded) {
-        alert('Razorpay SDK failed to load. Please check your internet connection.');
+        showToast('Razorpay SDK failed to load. Please check your internet connection.', 'error');
         setSubmitting(false);
         return;
       }
@@ -86,8 +88,9 @@ export default function CartPage() {
 
             setOrderSuccess(verifyRes.order || orderRes.normalizedOrder);
             clearCart();
+            showToast('Order placed successfully!', 'success');
           } catch (err: any) {
-            alert(err.message || 'Shop order payment verification failed.');
+            showToast(err.message || 'Shop order payment verification failed.', 'error');
           } finally {
             setSubmitting(false);
           }
@@ -101,13 +104,13 @@ export default function CartPage() {
 
       const rzp = new (window as any).Razorpay(options);
       rzp.on('payment.failed', function (resp: any) {
-        alert(resp.error?.description || 'Shop order payment failed.');
+        showToast(resp.error?.description || 'Shop order payment failed.', 'error');
         setSubmitting(false);
       });
       rzp.open();
     } catch (err: any) {
       console.error('Error placing shop order:', err);
-      alert(err.message || 'Failed to place shop order.');
+      showToast(err.message || 'Failed to place shop order.', 'error');
       setSubmitting(false);
     }
   };

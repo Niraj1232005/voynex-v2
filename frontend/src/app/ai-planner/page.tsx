@@ -5,6 +5,9 @@ import { TbWand, TbArrowRight, TbMapPin, TbCalendar, TbCoin, TbMoodSmile, TbChec
 import Breadcrumbs from '@/components/Breadcrumbs';
 import { useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
+import AIItineraryDisplay from '@/components/AIItineraryDisplay';
+import { generateItineraryPDF } from '@/lib/pdfGenerator';
+import { useToast } from '@/contexts/ToastContext';
 
 const VIBES = ['Relaxing', 'Adventurous', 'Cultural', 'Party', 'Romantic', 'Family Friendly'];
 const LOADING_STEPS = [
@@ -18,6 +21,7 @@ const LOADING_STEPS = [
 type PlannerState = 'form' | 'loading' | 'results';
 
 export default function AIPlannerPage() {
+  const { showToast } = useToast();
   const [state, setState] = useState<PlannerState>('form');
   const [loadingStep, setLoadingStep] = useState(0);
   
@@ -71,7 +75,7 @@ export default function AIPlannerPage() {
       }
       setState('results');
     } catch (err: any) {
-      alert(err.message || 'Failed to generate AI trip plan');
+      showToast(err.message || 'Failed to generate AI trip plan', 'error');
       setState('form');
     }
   };
@@ -233,45 +237,84 @@ export default function AIPlannerPage() {
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
             >
               <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
-                <button onClick={handleReset} className="flex items-center gap-2 text-sm font-semibold text-muted hover:text-foreground transition-colors">
+                <button 
+                  type="button"
+                  onClick={handleReset} 
+                  className="flex items-center gap-2 text-sm font-semibold text-muted hover:text-foreground transition-colors tap-target"
+                >
                   <TbChevronLeft size={16} /> Edit Preferences
                 </button>
-                <div className="flex gap-3">
-                  <button onClick={() => {
-                    setSaving(true);
-                    api.post('/ai/plans', {
-                      destination,
-                      durationDays: Number(days),
-                      budget,
-                      travelers: '1',
-                      itinerary: { text: aiPlan },
-                    })
-                      .then(() => setSaved(true))
-                      .catch(err => alert(err.message || 'Failed to save itinerary. Please log in first.'))
-                      .finally(() => setSaving(false));
-                  }} disabled={saving || saved}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-bold shadow-md hover:bg-primary/90 transition-all disabled:opacity-60">
+                <div className="flex flex-wrap items-center gap-3">
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      try {
+                        generateItineraryPDF({
+                          destination,
+                          duration: days,
+                          budget,
+                          vibe,
+                          planText: aiPlan,
+                        });
+                        showToast('PDF downloaded successfully!', 'success');
+                      } catch (err: any) {
+                        showToast('Failed to generate PDF. Please try again.', 'error');
+                      }
+                    }}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-accent text-white text-sm font-bold shadow-md hover:bg-accent/90 transition-all tap-target"
+                  >
+                    <TbDownload size={17} /> Download PDF
+                  </button>
+
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      setSaving(true);
+                      api.post('/ai/plans', {
+                        destination,
+                        durationDays: Number(days),
+                        budget,
+                        travelers: '1',
+                        itinerary: { text: aiPlan },
+                      })
+                        .then(() => {
+                          setSaved(true);
+                          showToast('Itinerary saved to your account!', 'success');
+                        })
+                        .catch(err => {
+                          showToast(err.message || 'Failed to save itinerary. Please log in first.', 'error');
+                        })
+                        .finally(() => setSaving(false));
+                    }} 
+                    disabled={saving || saved}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-bold shadow-md hover:bg-primary/90 transition-all disabled:opacity-60 tap-target"
+                  >
                     {saving ? 'Saving...' : saved ? '✓ Saved!' : 'Save Itinerary'}
                   </button>
-                  <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-surface hover:bg-surface-hover border border-border text-sm font-semibold transition-colors">
+
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      if (typeof window !== 'undefined' && navigator.clipboard) {
+                        navigator.clipboard.writeText(window.location.href);
+                        showToast('Link copied to clipboard!', 'info');
+                      }
+                    }}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-surface hover:bg-surface-hover border border-border text-sm font-semibold transition-colors tap-target"
+                  >
                     <TbShare size={16} /> Share
                   </button>
                 </div>
               </div>
 
-              <div className="bg-card rounded-3xl border border-border overflow-hidden shadow-2xl">
-                <div className="p-8 sm:p-10 bg-gradient-to-br from-primary/10 to-teal/10 border-b border-border">
-                  <div className="inline-flex px-3 py-1 rounded-full bg-background border border-border text-xs font-bold uppercase tracking-wider mb-4 text-accent">
-                    {vibe} • {budget} • {days} Days
-                  </div>
-                  <h2 className="text-3xl sm:text-4xl font-bold mb-2">Your AI Itinerary for {destination}</h2>
-                  <p className="text-muted font-medium">Curated specifically based on your unique preferences.</p>
-                </div>
-
-                <div className="p-6 sm:p-10 bg-background whitespace-pre-wrap leading-relaxed text-foreground/90 font-medium">
-                  {aiPlan}
-                </div>
-              </div>
+              {/* Structured Itinerary Display */}
+              <AIItineraryDisplay 
+                itineraryText={aiPlan}
+                destination={destination}
+                duration={days}
+                budget={budget}
+                vibe={vibe}
+              />
             </motion.div>
           )}
         </AnimatePresence>

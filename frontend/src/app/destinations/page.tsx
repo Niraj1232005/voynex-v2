@@ -5,17 +5,9 @@ import { motion } from 'framer-motion';
 import { FiMapPin, FiStar, FiArrowRight } from 'react-icons/fi';
 import Breadcrumbs from '@/components/Breadcrumbs';
 import { api } from '@/lib/api';
+import { getDestinationImage } from '@/lib/destinationImages';
 
 const fadeUp = { hidden: { opacity: 0, y: 30 }, visible: { opacity: 1, y: 0 } };
-
-const DEST_GRADIENTS = [
-  'from-blue-500 to-purple-600',
-  'from-orange-400 to-pink-500',
-  'from-teal-400 to-emerald-600',
-  'from-rose-400 to-red-500',
-  'from-indigo-400 to-blue-600',
-  'from-amber-400 to-orange-600',
-];
 
 export default function DestinationsPage() {
   const [trips, setTrips] = useState<any[]>([]);
@@ -41,17 +33,21 @@ export default function DestinationsPage() {
       entry.totalReviews += trip.reviewCount || 0;
     });
 
-    return Array.from(destMap.entries()).map(([name, data]) => ({
-      name,
-      tripCount: data.trips.length,
-      avgRating: +(data.trips.reduce((sum, t) => sum + (t.rating || 4.8), 0) / data.trips.length).toFixed(1),
-      priceRange: {
-        min: Math.min(...data.trips.map(t => t.price || 0)),
-        max: Math.max(...data.trips.map(t => t.price || 0)),
-      },
-      totalReviews: data.totalReviews,
-      activities: [...new Set(data.trips.flatMap(t => t.activityType || []))],
-    }));
+    return Array.from(destMap.entries()).map(([name, data]) => {
+      const fallbackTripImage = data.trips.find(t => t.images && t.images[0])?.images?.[0];
+      return {
+        name,
+        imageUrl: getDestinationImage(name, fallbackTripImage),
+        tripCount: data.trips.length,
+        avgRating: +(data.trips.reduce((sum, t) => sum + (t.rating || 4.8), 0) / data.trips.length).toFixed(1),
+        priceRange: {
+          min: Math.min(...data.trips.map(t => t.price || 0)),
+          max: Math.max(...data.trips.map(t => t.price || 0)),
+        },
+        totalReviews: data.totalReviews,
+        activities: [...new Set(data.trips.flatMap(t => t.activityType || []))],
+      };
+    });
   }, [trips]);
 
   if (loading) {
@@ -84,13 +80,25 @@ export default function DestinationsPage() {
                 <motion.div key={dest.name} variants={fadeUp}>
                   <Link href={`/trips?search=${encodeURIComponent(dest.name)}`}
                     className="group block rounded-3xl border border-border bg-card overflow-hidden hover:shadow-2xl transition-all duration-300">
-                    <div className={`relative h-56 bg-gradient-to-br ${DEST_GRADIENTS[idx % DEST_GRADIENTS.length]}`}>
-                      <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-all" />
-                      <div className="absolute top-4 right-4 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/50 backdrop-blur-md text-white text-xs font-bold">
+                    <div className="relative h-60 overflow-hidden bg-muted">
+                      <img
+                        src={dest.imageUrl}
+                        alt={dest.name}
+                        loading="lazy"
+                        className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src =
+                            'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=1200&auto=format&fit=crop&q=80';
+                        }}
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-black/10 group-hover:via-black/25 transition-all" />
+                      <div className="absolute top-4 right-4 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md text-white text-xs font-bold border border-white/10 shadow-sm">
                         <FiStar size={13} className="fill-yellow-400 text-yellow-400" /> {dest.avgRating} ({dest.totalReviews})
                       </div>
-                      <div className="absolute bottom-4 left-4 text-white">
-                        <span className="flex items-center gap-1 text-xs opacity-90 mb-1"><FiMapPin size={14} /> Destination</span>
+                      <div className="absolute bottom-4 left-4 right-4 text-white">
+                        <span className="flex items-center gap-1 text-xs font-semibold text-white/80 mb-1 drop-shadow-sm">
+                          <FiMapPin size={14} /> Destination
+                        </span>
                         <h2 className="text-2xl font-bold drop-shadow-md">{dest.name}</h2>
                       </div>
                     </div>

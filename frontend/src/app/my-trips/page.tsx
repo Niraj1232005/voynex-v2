@@ -6,6 +6,7 @@ import { TbTicket, TbHeart, TbMapPin, TbCalendar, TbUsers, TbSettings, TbArrowRi
 import { Trip } from '@/types';
 import Breadcrumbs from '@/components/Breadcrumbs';
 import { api } from '@/lib/api';
+import { useToast } from '@/contexts/ToastContext';
 
 type Tab = 'bookings' | 'saved';
 
@@ -37,6 +38,7 @@ export default function MyTripsPage() {
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [resumingId, setResumingId] = useState<string | null>(null);
+  const { showToast } = useToast();
 
   const fetchBookings = () => {
     Promise.all([
@@ -87,7 +89,7 @@ export default function MyTripsPage() {
     try {
       const isScriptLoaded = await loadRazorpayScript();
       if (!isScriptLoaded) {
-        alert('Razorpay SDK failed to load. Please check your internet connection.');
+        showToast('Razorpay SDK failed to load. Please check your internet connection.', 'error');
         setResumingId(null);
         return;
       }
@@ -112,10 +114,10 @@ export default function MyTripsPage() {
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature,
             });
-            alert('Payment completed successfully!');
+            showToast('Payment completed successfully!', 'success');
             fetchBookings();
           } catch (err: any) {
-            alert(err.message || 'Payment verification failed.');
+            showToast(err.message || 'Payment verification failed.', 'error');
           } finally {
             setResumingId(null);
           }
@@ -129,12 +131,12 @@ export default function MyTripsPage() {
 
       const rzp = new (window as any).Razorpay(options);
       rzp.on('payment.failed', function (resp: any) {
-        alert(resp.error?.description || 'Payment failed.');
+        showToast(resp.error?.description || 'Payment failed.', 'error');
         setResumingId(null);
       });
       rzp.open();
     } catch (err: any) {
-      alert(err.message || 'Failed to initiate payment resume.');
+      showToast(err.message || 'Failed to initiate payment resume.', 'error');
       setResumingId(null);
     }
   };
