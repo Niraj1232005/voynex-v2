@@ -59,11 +59,11 @@ export interface FreeTimeSearchResult {
 
 const CATEGORY_MAP: Record<FreeTimeCategory, string> = {
   food: 'catering.restaurant,catering.cafe,catering.fast_food,catering.food_court,catering.pub,catering.bar',
-  rest: 'catering.cafe,leisure.park,natural.park,leisure.garden',
+  rest: 'catering.cafe,leisure.park,leisure.playground,natural,national_park',
   shopping:
-    'commercial.shopping_mall,commercial.supermarket,commercial.marketplace,commercial.convenience,commercial.chemist,commercial.bookshop',
+    'commercial.shopping_mall,commercial.supermarket,commercial.marketplace,commercial.convenience,commercial.chemist,commercial.books,commercial.gift_and_souvenir',
   sightseeing:
-    'tourism.attraction,tourism.museum,entertainment.culture,tourism.gallery,entertainment.aquarium,natural.park,tourism.artwork',
+    'tourism.sights,tourism.attraction,entertainment.museum,entertainment.culture,entertainment.culture.arts_centre,entertainment.aquarium,entertainment.zoo,heritage',
 };
 
 const DISCLAIMER_TEXT =
@@ -227,6 +227,10 @@ export class FreetimeService {
     }
 
     if (!placesRes.ok) {
+      const errorText = await placesRes.text().catch(() => '');
+      this.logger.error(
+        `Places provider error: ${placesRes.status} ${placesRes.statusText} - ${errorText}`,
+      );
       if (placesRes.status === 401 || placesRes.status === 403) {
         throw new BadGatewayException(
           'Places provider authentication or quota exceeded',

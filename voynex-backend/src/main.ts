@@ -8,7 +8,28 @@ async function bootstrap() {
   app.use(cookieParser());
 
   app.enableCors({
-    origin: ['http://localhost:3001', 'http://localhost:3000'],
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      const frontendUrls = (process.env.FRONTEND_URL || '')
+        .split(',')
+        .map((u) => u.trim().replace(/\/+$/, ''))
+        .filter(Boolean);
+
+      const isAllowed =
+        process.env.NODE_ENV !== 'production' ||
+        origin.startsWith('http://localhost:') ||
+        origin.startsWith('http://127.0.0.1:') ||
+        origin.startsWith('http://192.168.') ||
+        origin.startsWith('http://10.') ||
+        origin.endsWith('.vercel.app') ||
+        frontendUrls.includes(origin);
+
+      if (isAllowed) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     credentials: true,
   });
   app.useGlobalPipes(
