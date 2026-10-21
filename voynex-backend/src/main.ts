@@ -7,6 +7,14 @@ async function bootstrap() {
 
   app.use(cookieParser());
 
+  // Normalize consecutive slashes in incoming request URLs (e.g., //trips -> /trips)
+  app.use((req: any, res: any, next: any) => {
+    if (req.url) {
+      req.url = req.url.replace(/\/{2,}/g, '/');
+    }
+    next();
+  });
+
   app.enableCors({
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
@@ -22,6 +30,7 @@ async function bootstrap() {
         origin.startsWith('http://192.168.') ||
         origin.startsWith('http://10.') ||
         origin.endsWith('.vercel.app') ||
+        origin.endsWith('nirajrathod.me') ||
         frontendUrls.includes(origin);
 
       if (isAllowed) {

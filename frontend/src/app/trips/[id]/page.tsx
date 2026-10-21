@@ -6,8 +6,37 @@ import { TbMapPin, TbStarFilled, TbClock, TbUsers, TbCheck, TbX, TbMinus, TbPlus
 import Breadcrumbs from '@/components/Breadcrumbs';
 import { api } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { getDestinationImage } from '@/lib/destinationImages';
 
 function mapBackendTripToFrontend(bTrip: any): any {
+  let images: string[] = [];
+  if (Array.isArray(bTrip.images)) {
+    images = bTrip.images.filter((img: any) => typeof img === 'string' && img.trim().length > 0);
+  } else if (typeof bTrip.images === 'string' && bTrip.images.trim().length > 0) {
+    try {
+      const parsed = JSON.parse(bTrip.images);
+      if (Array.isArray(parsed)) {
+        images = parsed.filter((img: any) => typeof img === 'string' && img.trim().length > 0);
+      } else if (typeof parsed === 'string' && parsed.trim().length > 0) {
+        images = [parsed.trim()];
+      }
+    } catch {
+      images = bTrip.images.split(',').map((s: string) => s.trim()).filter(Boolean);
+    }
+  }
+
+  if (images.length === 0 && (bTrip.image || bTrip.coverImage)) {
+    const single = bTrip.image || bTrip.coverImage;
+    if (typeof single === 'string' && single.trim()) {
+      images = [single.trim()];
+    }
+  }
+
+  if (images.length === 0) {
+    const fallback = getDestinationImage(bTrip.destination);
+    if (fallback) images = [fallback];
+  }
+
   return {
     _id: bTrip.id || bTrip._id,
     id: bTrip.id || bTrip._id,
@@ -21,7 +50,7 @@ function mapBackendTripToFrontend(bTrip: any): any {
     difficulty: bTrip.difficulty || 'moderate',
     rating: bTrip.rating || 4.8,
     reviewCount: bTrip.reviewCount || 0,
-    images: (bTrip.images && bTrip.images.length > 0) ? bTrip.images : ['https://images.unsplash.com/photo-1626621341517-bbf3d9990a23?w=800&q=80'],
+    images: images.length > 0 ? images : ['https://images.unsplash.com/photo-1626621341517-bbf3d9990a23?w=800&q=80'],
     activityType: bTrip.activityType || ['adventure'],
     highlights: bTrip.highlights || ['Sightseeing', 'Exploration'],
     itinerary: bTrip.itinerary || [],
@@ -32,10 +61,6 @@ function mapBackendTripToFrontend(bTrip: any): any {
   };
 }
 
-const GRADIENTS = [
-  'from-blue-400 to-purple-600', 'from-orange-400 to-pink-500', 'from-teal-400 to-emerald-600',
-  'from-rose-400 to-red-500', 'from-indigo-400 to-blue-600', 'from-amber-400 to-orange-600',
-];
 
 // Simple keyword-based sentiment analysis
 function analyzeSentiment(text: string): 'positive' | 'neutral' | 'negative' {
@@ -124,10 +149,6 @@ export default function TripDetailPage() {
 
   const totalGuests = adults + children + seniors;
   const totalPrice = trip.price * totalGuests;
-  const gradIdx = 0;
-  const mainGradient = GRADIENTS[gradIdx % GRADIENTS.length];
-  const thumbGradient1 = GRADIENTS[(gradIdx + 1) % GRADIENTS.length];
-  const thumbGradient2 = GRADIENTS[(gradIdx + 2) % GRADIENTS.length];
 
   const handleBookNow = () => {
     // Phase 3 Auth Logic: If not authenticated, the actual modal will be triggered.
@@ -168,22 +189,82 @@ export default function TripDetailPage() {
         </div>
 
         {/* Gallery */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10 h-[40vh] sm:h-[50vh]">
-          <div className="md:col-span-2 relative rounded-2xl overflow-hidden img-dark-overlay">
-            <div className={`absolute inset-0 bg-gradient-to-br ${mainGradient}`} />
-            <div className="absolute inset-0 bg-black/10" />
+        {trip.images && trip.images.length === 1 ? (
+          <div className="relative rounded-2xl overflow-hidden mb-10 h-[40vh] sm:h-[50vh] bg-surface">
+            <img
+              src={trip.images[0]}
+              alt={trip.title}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = getDestinationImage(trip.destination);
+              }}
+            />
+            <div className="absolute inset-0 bg-black/10 pointer-events-none" />
           </div>
-          <div className="hidden md:flex flex-col gap-4">
-            <div className="flex-1 relative rounded-2xl overflow-hidden img-dark-overlay">
-              <div className={`absolute inset-0 bg-gradient-to-br ${thumbGradient1}`} />
-              <div className="absolute inset-0 bg-black/10" />
+        ) : trip.images && trip.images.length === 2 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10 h-[40vh] sm:h-[50vh]">
+            <div className="relative rounded-2xl overflow-hidden bg-surface">
+              <img
+                src={trip.images[0]}
+                alt={trip.title}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = getDestinationImage(trip.destination);
+                }}
+              />
+              <div className="absolute inset-0 bg-black/10 pointer-events-none" />
             </div>
-            <div className="flex-1 relative rounded-2xl overflow-hidden img-dark-overlay">
-              <div className={`absolute inset-0 bg-gradient-to-br ${thumbGradient2}`} />
-              <div className="absolute inset-0 bg-black/10" />
+            <div className="relative rounded-2xl overflow-hidden bg-surface">
+              <img
+                src={trip.images[1]}
+                alt={`${trip.title} 2`}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = getDestinationImage(trip.destination);
+                }}
+              />
+              <div className="absolute inset-0 bg-black/10 pointer-events-none" />
             </div>
           </div>
-        </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10 h-[40vh] sm:h-[50vh]">
+            <div className="md:col-span-2 relative rounded-2xl overflow-hidden bg-surface">
+              <img
+                src={trip.images?.[0] || getDestinationImage(trip.destination)}
+                alt={trip.title}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = getDestinationImage(trip.destination);
+                }}
+              />
+              <div className="absolute inset-0 bg-black/10 pointer-events-none" />
+            </div>
+            <div className="hidden md:flex flex-col gap-4">
+              <div className="flex-1 relative rounded-2xl overflow-hidden bg-surface">
+                <img
+                  src={trip.images?.[1] || getDestinationImage(trip.destination)}
+                  alt={`${trip.title} 2`}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = getDestinationImage(trip.destination);
+                  }}
+                />
+                <div className="absolute inset-0 bg-black/10 pointer-events-none" />
+              </div>
+              <div className="flex-1 relative rounded-2xl overflow-hidden bg-surface">
+                <img
+                  src={trip.images?.[2] || getDestinationImage(trip.destination)}
+                  alt={`${trip.title} 3`}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = getDestinationImage(trip.destination);
+                  }}
+                />
+                <div className="absolute inset-0 bg-black/10 pointer-events-none" />
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
           {/* Main Content */}

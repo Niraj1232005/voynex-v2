@@ -1,7 +1,9 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+const API_URL = RAW_API_URL.replace(/\/+$/, '');
 
 async function request(path: string, options: RequestInit = {}) {
-  const url = `${API_URL}${path}`;
+  const cleanPath = '/' + path.replace(/^\/+/, '');
+  const url = `${API_URL}${cleanPath}`;
   const headers = new Headers(options.headers);
 
   if (!(options.body instanceof FormData) && options.body) {
