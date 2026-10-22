@@ -56,7 +56,7 @@ export default function Header() {
           { href: '/ai-planner', label: 'AI Planner', description: 'Generate personalized itineraries', icon: TbCpu },
           { href: '/freetime', label: 'Free-Time Finder', description: 'Nearby spots during layovers & station gaps', icon: TbClock },
           { href: '/packing-assistant', label: 'Smart Packing', description: 'AI-powered packing checklists', icon: TbPackage },
-          { href: '/chat', label: 'AI Chatbot', description: 'Chat with our AI travel expert', icon: TbMessageCircle },
+          { href: '/chat', label: 'Available Travel Assistant', description: 'Chat with our AI travel expert', icon: TbMessageCircle },
         ],
       },
       {

@@ -224,7 +224,7 @@ export default function HomePage() {
                           <div className="p-8 text-center">
                             <p className="text-muted font-medium mb-3">No results found for &quot;{searchQuery}&quot;</p>
                             <Link href="/chat" className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-accent/10 text-accent font-semibold hover:bg-accent hover:text-white transition-colors">
-                              Try the AI chatbot
+                              Try the Available Travel Assistant
                             </Link>
                           </div>
                         )}
