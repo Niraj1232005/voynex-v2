@@ -64,39 +64,94 @@ export class UsersService {
   ) { }
 
   async create(createUserDto: CreateUserDto): Promise<User> {
+    if (createUserDto.role === 'platform_admin') {
+      throw new BadRequestException('Platform admin accounts cannot be created via public registration.');
+    }
+
     const existingUser = await this.usersRepository.findOne({
       where: { email: createUserDto.email },
+      relations: ['organization'],
     });
 
     if (existingUser) {
-      throw new BadRequestException('Email already exists');
+      if (existingUser.organization) {
+        if (!existingUser.organization.isApproved || existingUser.organization.status === 'pending') {
+          throw new BadRequestException('An agency application with this email has already been submitted and is awaiting admin approval. Please log in to check your application status.');
+        } else if (existingUser.organization.status === 'rejected') {
+          throw new BadRequestException('An agency application with this email exists and was rejected. Please log in to check your application status.');
+        } else {
+          throw new BadRequestException('An account with this email already exists. Please log in to your agency portal.');
+        }
+      }
+      throw new BadRequestException('An account with this email already exists. Existing travelers must log in before submitting an agency application.');
     }
 
     return this.dataSource.transaction(async (entityManager) => {
       let organizationId = createUserDto.organizationId || null;
+      const isAgencyIntent = createUserDto.role === 'admin' || Boolean(createUserDto.organizationName);
 
-      if (createUserDto.organizationName) {
-        const slug = createUserDto.organizationName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+      if (isAgencyIntent) {
+        if (!createUserDto.organizationName || !createUserDto.organizationName.trim()) {
+          throw new BadRequestException('Agency organization name is required for agency registration.');
+        }
+        const slug = createUserDto.organizationName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') + '-' + Date.now().toString(36);
         let org = entityManager.create(Organization, {
-          name: createUserDto.organizationName,
+          name: createUserDto.organizationName.trim(),
           slug,
           email: createUserDto.email,
           subscriptionPlan: 'free',
           isApproved: false, // Pending admin approval
+          status: 'pending',
         });
         org = await entityManager.save(org);
         organizationId = org.id;
       }
+
+      const assignedRole = isAgencyIntent ? 'admin' : (createUserDto.role || 'user');
 
       const user = entityManager.create(User, {
         email: createUserDto.email,
         password: createUserDto.password,
         firstName: createUserDto.firstName,
         lastName: createUserDto.lastName,
-        role: createUserDto.role || 'user',
+        role: assignedRole,
         organizationId: organizationId || undefined,
       });
 
+      return entityManager.save(user);
+    });
+  }
+
+  async applyAgency(userId: string, organizationName: string): Promise<User> {
+    const user = await this.findById(userId);
+    if (!organizationName || !organizationName.trim()) {
+      throw new BadRequestException('Agency organization name is required.');
+    }
+
+    if (user.organizationId) {
+      const existingOrg = await this.dataSource.getRepository(Organization).findOne({ where: { id: user.organizationId } });
+      if (existingOrg) {
+        if (existingOrg.isApproved && existingOrg.status === 'approved') {
+          throw new BadRequestException('Your account is already an approved agency.');
+        }
+        throw new BadRequestException(`Your agency application for "${existingOrg.name}" is already on file (status: ${existingOrg.status}).`);
+      }
+    }
+
+    return this.dataSource.transaction(async (entityManager) => {
+      const slug = organizationName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') + '-' + Date.now().toString(36);
+      let org = entityManager.create(Organization, {
+        name: organizationName.trim(),
+        slug,
+        email: user.email,
+        subscriptionPlan: 'free',
+        isApproved: false,
+        status: 'pending',
+      });
+      org = await entityManager.save(org);
+
+      user.organizationId = org.id;
+      user.role = 'admin';
       return entityManager.save(user);
     });
   }

@@ -13,6 +13,12 @@ export default function AgencyTripsPage() {
   // Form Fields
   const [title, setTitle] = useState('');
   const [destination, setDestination] = useState('');
+  const [destLat, setDestLat] = useState('');
+  const [destLng, setDestLng] = useState('');
+  const [meetingName, setMeetingName] = useState('');
+  const [meetingAddress, setMeetingAddress] = useState('');
+  const [meetingLat, setMeetingLat] = useState('');
+  const [meetingLng, setMeetingLng] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState(10000);
   const [durationDays, setDurationDays] = useState(5);
@@ -23,6 +29,7 @@ export default function AgencyTripsPage() {
   const [included, setIncluded] = useState('');
   const [excluded, setExcluded] = useState('');
   const [startDates, setStartDates] = useState('');
+  const [itinerary, setItinerary] = useState<Array<{ day: number; title: string; description: string; activities: string }>>([]);
 
   const fetchTrips = () => {
     setLoading(true);
@@ -39,10 +46,43 @@ export default function AgencyTripsPage() {
     fetchTrips();
   }, []);
 
+  const handleAddItineraryDay = () => {
+    setItinerary(prev => [
+      ...prev,
+      {
+        day: prev.length + 1,
+        title: `Day ${prev.length + 1}`,
+        description: '',
+        activities: '',
+      },
+    ]);
+  };
+
+  const handleRemoveItineraryDay = (index: number) => {
+    setItinerary(prev => {
+      const filtered = prev.filter((_, i) => i !== index);
+      return filtered.map((d, i) => ({ ...d, day: i + 1 }));
+    });
+  };
+
+  const handleUpdateItineraryDay = (index: number, field: string, value: string) => {
+    setItinerary(prev => {
+      const copy = [...prev];
+      copy[index] = { ...copy[index], [field]: value };
+      return copy;
+    });
+  };
+
   const openAddModal = () => {
     setEditingTrip(null);
     setTitle('');
     setDestination('');
+    setDestLat('');
+    setDestLng('');
+    setMeetingName('');
+    setMeetingAddress('');
+    setMeetingLat('');
+    setMeetingLng('');
     setDescription('');
     setPrice(10000);
     setDurationDays(5);
@@ -53,6 +93,10 @@ export default function AgencyTripsPage() {
     setIncluded('');
     setExcluded('');
     setStartDates('');
+    setItinerary([
+      { day: 1, title: 'Arrival & Welcome', description: 'Arrive at the destination, check-in, and welcome briefing.', activities: 'Welcome briefing, Check-in' },
+      { day: 2, title: 'Guided Exploration', description: 'Explore key sights and natural highlights.', activities: 'Sightseeing, Local experience' },
+    ]);
     setModalOpen(true);
   };
 
@@ -60,6 +104,12 @@ export default function AgencyTripsPage() {
     setEditingTrip(t);
     setTitle(t.title || '');
     setDestination(t.destination || '');
+    setDestLat(t.coordinates?.lat ? String(t.coordinates.lat) : '');
+    setDestLng(t.coordinates?.lng ? String(t.coordinates.lng) : '');
+    setMeetingName(t.meetingPoint?.name || '');
+    setMeetingAddress(t.meetingPoint?.address || '');
+    setMeetingLat(t.meetingPoint?.coordinates?.lat ? String(t.meetingPoint.coordinates.lat) : '');
+    setMeetingLng(t.meetingPoint?.coordinates?.lng ? String(t.meetingPoint.coordinates.lng) : '');
     setDescription(t.description || '');
     setPrice(t.price || 0);
     setDurationDays((t as any).durationDays || t.duration || 1);
@@ -70,6 +120,18 @@ export default function AgencyTripsPage() {
     setIncluded(t.included?.join(', ') || '');
     setExcluded(t.excluded?.join(', ') || '');
     setStartDates(t.startDates?.join(', ') || '');
+    if (t.itinerary && Array.isArray(t.itinerary) && t.itinerary.length > 0) {
+      setItinerary(t.itinerary.map((d: any, idx: number) => ({
+        day: d.day || (idx + 1),
+        title: d.title || `Day ${idx + 1}`,
+        description: d.description || '',
+        activities: Array.isArray(d.activities) ? d.activities.join(', ') : (d.activities || ''),
+      })));
+    } else {
+      setItinerary([
+        { day: 1, title: 'Day 1 Schedule', description: '', activities: '' },
+      ]);
+    }
     setModalOpen(true);
   };
 
@@ -83,7 +145,28 @@ export default function AgencyTripsPage() {
       }
     }
 
-    const payload = {
+    const parsedCoordinates = (destLat && destLng && !isNaN(Number(destLat)) && !isNaN(Number(destLng)))
+      ? { lat: Number(destLat), lng: Number(destLng) }
+      : undefined;
+
+    const parsedMeetingPoint = (meetingName || meetingAddress || (meetingLat && meetingLng))
+      ? {
+          name: meetingName.trim() || destination.trim(),
+          address: meetingAddress.trim() || undefined,
+          coordinates: (meetingLat && meetingLng && !isNaN(Number(meetingLat)) && !isNaN(Number(meetingLng)))
+            ? { lat: Number(meetingLat), lng: Number(meetingLng) }
+            : undefined,
+        }
+      : undefined;
+
+    const formattedItinerary = itinerary.map((d, idx) => ({
+      day: idx + 1,
+      title: d.title.trim() || `Day ${idx + 1}`,
+      description: d.description.trim(),
+      activities: d.activities.split(',').map(s => s.trim()).filter(Boolean),
+    }));
+
+    const payload: any = {
       title,
       destination,
       description,
@@ -96,7 +179,11 @@ export default function AgencyTripsPage() {
       included: included.split(',').map(s => s.trim()).filter(Boolean),
       excluded: excluded.split(',').map(s => s.trim()).filter(Boolean),
       startDates: startDates.split(',').map(s => s.trim()).filter(Boolean),
+      itinerary: formattedItinerary,
     };
+
+    if (parsedCoordinates) payload.coordinates = parsedCoordinates;
+    if (parsedMeetingPoint) payload.meetingPoint = parsedMeetingPoint;
 
     try {
       if (editingTrip) {
@@ -270,10 +357,128 @@ export default function AgencyTripsPage() {
                 </div>
               </div>
 
+              <div className="border border-border/80 rounded-2xl p-4 bg-muted/20 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-bold text-foreground">Location & Meeting Point</h4>
+                    <p className="text-xs text-muted">Provide real coordinates and meeting location for accurate traveler mapping</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">Destination Latitude</label>
+                    <input type="text" value={destLat} onChange={e => setDestLat(e.target.value)} placeholder="e.g. 32.2396"
+                      className="w-full px-4 py-2.5 border border-border bg-background rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">Destination Longitude</label>
+                    <input type="text" value={destLng} onChange={e => setDestLng(e.target.value)} placeholder="e.g. 77.1887"
+                      className="w-full px-4 py-2.5 border border-border bg-background rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-border/40">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">Meeting Point Name</label>
+                    <input type="text" value={meetingName} onChange={e => setMeetingName(e.target.value)} placeholder="e.g. Manali Mall Road Bus Stand"
+                      className="w-full px-4 py-2.5 border border-border bg-background rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">Meeting Address / Landmark</label>
+                    <input type="text" value={meetingAddress} onChange={e => setMeetingAddress(e.target.value)} placeholder="e.g. Near Circuit House, Mall Road"
+                      className="w-full px-4 py-2.5 border border-border bg-background rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">Meeting Point Lat (optional)</label>
+                    <input type="text" value={meetingLat} onChange={e => setMeetingLat(e.target.value)} placeholder="e.g. 32.2432"
+                      className="w-full px-4 py-2.5 border border-border bg-background rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">Meeting Point Lng (optional)</label>
+                    <input type="text" value={meetingLng} onChange={e => setMeetingLng(e.target.value)} placeholder="e.g. 77.1892"
+                      className="w-full px-4 py-2.5 border border-border bg-background rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+                  </div>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">Departure Dates</label>
                 <input type="text" value={startDates} onChange={e => setStartDates(e.target.value)} placeholder="2026-05-15, 2026-06-01"
                   className="w-full px-4 py-3 border border-border bg-background rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+              </div>
+
+              {/* Day-by-Day Itinerary Editor */}
+              <div className="border border-border/80 rounded-2xl p-4 bg-muted/20 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-bold text-foreground">Day-by-Day Itinerary</h4>
+                    <p className="text-xs text-muted">Detail each day&apos;s title, schedule description, and specific activities</p>
+                  </div>
+                  <button type="button" onClick={handleAddItineraryDay} className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-all">
+                    <FiPlus size={14} /> Add Day
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  {itinerary.map((dayItem, idx) => (
+                    <div key={idx} className="p-4 rounded-xl border border-border bg-background space-y-3 shadow-sm">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold uppercase tracking-wider text-primary bg-primary/10 px-2.5 py-1 rounded-md">
+                          Day {idx + 1}
+                        </span>
+                        {itinerary.length > 1 && (
+                          <button type="button" onClick={() => handleRemoveItineraryDay(idx)} className="text-xs text-red-500 hover:text-red-700 flex items-center gap-1 font-semibold transition-colors">
+                            <FiTrash2 size={13} /> Remove Day
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-3">
+                        <div>
+                          <label className="block text-xs font-bold text-muted mb-1">Day Title</label>
+                          <input
+                            type="text"
+                            value={dayItem.title}
+                            onChange={e => handleUpdateItineraryDay(idx, 'title', e.target.value)}
+                            placeholder={`e.g. Day ${idx + 1}: Arrival & Orientation`}
+                            className="w-full px-3 py-2 border border-border bg-card rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-muted mb-1">Schedule & Details</label>
+                          <textarea
+                            value={dayItem.description}
+                            onChange={e => handleUpdateItineraryDay(idx, 'description', e.target.value)}
+                            placeholder="Detail what travelers will do, see, and experience on this day..."
+                            rows={2}
+                            className="w-full px-3 py-2 border border-border bg-card rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-muted mb-1">Activities (comma-separated)</label>
+                          <input
+                            type="text"
+                            value={dayItem.activities}
+                            onChange={e => handleUpdateItineraryDay(idx, 'activities', e.target.value)}
+                            placeholder="e.g. Scenic drive, Local lunch, Temple tour"
+                            className="w-full px-3 py-2 border border-border bg-card rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleAddItineraryDay}
+                  className="w-full py-2.5 border border-dashed border-border rounded-xl text-xs font-bold text-muted hover:text-foreground hover:border-primary/50 transition-all flex items-center justify-center gap-1.5"
+                >
+                  <FiPlus size={14} /> Add Another Day
+                </button>
               </div>
             </form>
 

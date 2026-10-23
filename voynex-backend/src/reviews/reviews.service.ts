@@ -76,7 +76,7 @@ export class ReviewsService {
   async findByTrip(tripId: string) {
     const reviews = await this.reviewsRepository
       .createQueryBuilder('review')
-      .leftJoinAndMapOne('review.user', User, 'user', 'user.id = review.userId')
+      .leftJoinAndMapOne('review.user', User, 'user', 'user.id::text = review.userId::text')
       .where('review.tripId = :tripId', { tripId })
       .orderBy('review.createdAt', 'DESC')
       .getMany();

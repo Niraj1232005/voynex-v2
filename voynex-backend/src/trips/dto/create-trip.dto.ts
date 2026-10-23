@@ -1,4 +1,30 @@
-import { IsString, IsNotEmpty, IsNumber, IsOptional, IsArray, IsBoolean } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsArray,
+  IsObject,
+  ValidateNested,
+} from 'class-validator';
+import { Type } from 'class-transformer';
+
+export class ItineraryDayDto {
+  @IsNumber()
+  day: number;
+
+  @IsString()
+  @IsNotEmpty()
+  title: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsArray()
+  activities?: string[];
+}
 
 export class CreateTripDto {
   @IsString()
@@ -12,6 +38,14 @@ export class CreateTripDto {
   @IsString()
   @IsNotEmpty()
   destination: string;
+
+  @IsOptional()
+  @IsObject()
+  coordinates?: { lat: number; lng: number };
+
+  @IsOptional()
+  @IsObject()
+  meetingPoint?: { name: string; address?: string; coordinates?: { lat: number; lng: number } };
 
   @IsNumber()
   price: number;
@@ -45,7 +79,9 @@ export class CreateTripDto {
 
   @IsOptional()
   @IsArray()
-  itinerary?: any[];
+  @ValidateNested({ each: true })
+  @Type(() => ItineraryDayDto)
+  itinerary?: ItineraryDayDto[];
 
   @IsOptional()
   @IsArray()

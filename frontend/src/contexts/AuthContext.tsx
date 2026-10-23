@@ -7,7 +7,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<User>;
-  signup: (name: string, email: string, password: string, role: Role, organizationName?: string) => Promise<void>;
+  signup: (name: string, email: string, password: string, role: Role, organizationName?: string) => Promise<User>;
   logout: () => void;
   isAuthenticated: boolean;
 }
@@ -18,16 +18,27 @@ function mapBackendUser(bUser: any): User {
   let role: Role = 'user';
   if (bUser.role === 'platform_admin') {
     role = 'admin';
-  } else if (bUser.role === 'admin' || bUser.role === 'staff') {
+  } else if (bUser.role === 'admin' || bUser.role === 'staff' || bUser.organizationId || bUser.organization) {
     role = 'agency';
   }
+
+  const org = bUser.organization
+    ? {
+        id: bUser.organization.id || bUser.organizationId,
+        name: bUser.organization.name || '',
+        slug: bUser.organization.slug || '',
+        isApproved: Boolean(bUser.organization.isApproved),
+        status: bUser.organization.status || (bUser.organization.isApproved ? 'approved' : 'pending'),
+      }
+    : null;
 
   return {
     _id: bUser.id || bUser._id || bUser.sub,
     name: `${bUser.firstName || ''} ${bUser.lastName || ''}`.trim() || bUser.email?.split('@')?.[0] || 'User',
     email: bUser.email,
     role,
-    organization_id: bUser.organizationId,
+    organization_id: bUser.organizationId || org?.id,
+    organization: org,
     createdAt: bUser.createdAt || new Date().toISOString(),
   };
 }
@@ -75,16 +86,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signup = async (name: string, email: string, password: string, role: Role, organizationName?: string) => {
+  const signup = async (name: string, email: string, password: string, role: Role, organizationName?: string): Promise<User> => {
     setLoading(true);
     try {
       const nameParts = name.trim().split(/\s+/);
       const firstName = nameParts[0] || '';
       const lastName = nameParts.slice(1).join(' ') || '';
       
-      let backendRole = 'user';
-      if (role === 'admin') backendRole = 'platform_admin';
-      else if (role === 'agency') backendRole = 'admin'; // admin of their org
+      const backendRole = role === 'agency' ? 'admin' : 'user';
 
       // Register the user
       await api.post('/users/register', {
@@ -102,8 +111,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (token && typeof window !== 'undefined') {
         localStorage.setItem('voynex_token', token);
       }
-      setUser(mapBackendUser(loginRes?.user || loginRes));
+      const mappedUser = mapBackendUser(loginRes?.user || loginRes);
+      setUser(mappedUser);
       setLoading(false);
+      return mappedUser;
     } catch (err) {
       setLoading(false);
       throw err;

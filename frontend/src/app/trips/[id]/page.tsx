@@ -20,11 +20,42 @@ import {
   TbSparkles,
   TbCalendar,
   TbWallet,
+  TbExternalLink,
+  TbPackage,
+  TbHeart,
 } from 'react-icons/tb';
 import Breadcrumbs from '@/components/Breadcrumbs';
 import { api } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/contexts/ToastContext';
 import { getDestinationImage } from '@/lib/destinationImages';
+
+function getRentalImage(rental: any): string {
+  if (rental?.images && rental.images.length > 0) {
+    const first = Array.isArray(rental.images) ? rental.images[0] : rental.images;
+    if (typeof first === 'string' && first.trim().length > 0) return first.trim();
+  }
+  const text = `${rental?.title || ''} ${rental?.name || ''} ${rental?.category || ''}`.toLowerCase();
+  if (text.includes('bike') || text.includes('cycle')) {
+    return 'https://images.unsplash.com/photo-1485965120184-e220f721d03e?w=800&q=80';
+  }
+  if (text.includes('camera') || text.includes('gopro')) {
+    return 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=800&q=80';
+  }
+  if (text.includes('backpack') || text.includes('bag') || text.includes('trek')) {
+    return 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=800&q=80';
+  }
+  if (text.includes('tent') || text.includes('camp') || text.includes('stove')) {
+    return 'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=800&q=80';
+  }
+  if (text.includes('scooty') || text.includes('scooter') || text.includes('vehicle') || text.includes('car')) {
+    return 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?w=800&q=80';
+  }
+  if (text.includes('jacket') || text.includes('apparel') || text.includes('shoes')) {
+    return 'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=800&q=80';
+  }
+  return 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=800&q=80';
+}
 
 function mapBackendTripToFrontend(bTrip: any): any {
   let images: string[] = [];
@@ -75,7 +106,13 @@ function mapBackendTripToFrontend(bTrip: any): any {
     included: bTrip.included || ['Accommodation', 'Guide'],
     excluded: bTrip.excluded || ['Personal expenses'],
     startDates: bTrip.startDates || [],
-    agency: { _id: bTrip.organizationId, name: bTrip.organization?.name || 'Travel Agency' },
+    coordinates: bTrip.coordinates || null,
+    meetingPoint: bTrip.meetingPoint || null,
+    organizationId: bTrip.organizationId || bTrip.organization_id || bTrip.organization?.id,
+    agency: {
+      _id: bTrip.organizationId || bTrip.organization_id || bTrip.organization?.id,
+      name: bTrip.organization?.name || 'Travel Agency',
+    },
   };
 }
 
@@ -118,16 +155,66 @@ export default function TripDetailPage() {
   const { id } = useParams();
   const router = useRouter();
   const { isAuthenticated, user } = useAuth();
+  const { showToast } = useToast();
 
   const [trip, setTrip] = useState<any>(null);
   const [reviews, setReviews] = useState<any[]>([]);
+  const [rentals, setRentals] = useState<any[]>([]);
+  const [selectedRentals, setSelectedRentals] = useState<{ [rentalId: string]: number }>({});
   const [loading, setLoading] = useState(true);
+  const [isSaved, setIsSaved] = useState(false);
 
   const [selectedDate, setSelectedDate] = useState('');
   const [adults, setAdults] = useState(2);
   const [children, setChildren] = useState(0);
   const [seniors, setSeniors] = useState(0);
-  const [activeTab, setActiveTab] = useState<'overview' | 'itinerary' | 'included' | 'reviews'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'itinerary' | 'rentals' | 'included' | 'reviews'>('overview');
+
+  useEffect(() => {
+    if (!id) return;
+    try {
+      const saved = localStorage.getItem('voynex_saved_trips');
+      if (saved) {
+        const list: string[] = JSON.parse(saved);
+        if (list.includes(id as string)) setIsSaved(true);
+      }
+    } catch {}
+
+    api.get('/wishlist')
+      .then((res) => {
+        if (Array.isArray(res)) {
+          const match = res.some((w: any) => (w.itemId || w.item?._id || w.item?.id) === id);
+          if (match) setIsSaved(true);
+        }
+      })
+      .catch(() => {});
+  }, [id]);
+
+  const handleToggleWishlist = async () => {
+    if (!trip) return;
+    const tId = (trip._id || trip.id || id) as string;
+    const nextSaved = !isSaved;
+    setIsSaved(nextSaved);
+
+    try {
+      const saved = localStorage.getItem('voynex_saved_trips');
+      let local: string[] = saved ? JSON.parse(saved) : [];
+      if (nextSaved) {
+        if (!local.includes(tId)) local.push(tId);
+      } else {
+        local = local.filter((x) => x !== tId);
+      }
+      localStorage.setItem('voynex_saved_trips', JSON.stringify(local));
+
+      const res = await api.post('/wishlist', {
+        itemType: 'trip',
+        itemId: tId,
+      });
+      showToast(res?.message || (nextSaved ? 'Saved to wishlist!' : 'Removed from wishlist'), 'success');
+    } catch {
+      showToast(nextSaved ? 'Saved to wishlist!' : 'Removed from wishlist', 'success');
+    }
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -136,9 +223,22 @@ export default function TripDetailPage() {
       api.get(`/trips/${id}`),
       api.get(`/reviews/trip/${id}`).catch(() => ({ reviews: [] })),
     ])
-      .then(([tripRes, reviewsRes]) => {
+      .then(async ([tripRes, reviewsRes]) => {
         if (tripRes) {
-          setTrip(mapBackendTripToFrontend(tripRes));
+          const mapped = mapBackendTripToFrontend(tripRes);
+          setTrip(mapped);
+
+          // Fetch agency rentals if organizationId is present
+          if (mapped.organizationId) {
+            try {
+              const rentalsRes = await api.get(`/rentals?organizationId=${mapped.organizationId}`);
+              if (Array.isArray(rentalsRes)) {
+                setRentals(rentalsRes.filter((r: any) => r.isAvailable !== false));
+              }
+            } catch (err) {
+              console.warn('Could not load agency rentals:', err);
+            }
+          }
         }
         if (reviewsRes && Array.isArray(reviewsRes.reviews)) {
           setReviews(reviewsRes.reviews);
@@ -182,25 +282,66 @@ export default function TripDetailPage() {
   }
 
   const totalGuests = adults + children + seniors;
-  const totalPrice = trip.price * totalGuests;
+  const tripSubtotal = trip.price * totalGuests;
+  const tripDurationDays = trip.durationDays || trip.duration || 1;
+
+  // Selected Rentals calculations
+  const rentalItemsList = Object.entries(selectedRentals)
+    .filter(([_, qty]) => qty > 0)
+    .map(([rId, qty]) => {
+      const item = rentals.find((r) => (r.id || r._id) === rId);
+      const pricePerDay = Number(item?.pricePerDay || 0);
+      const deposit = Number(item?.deposit || 0);
+      return {
+        rentalId: rId,
+        title: item?.title || item?.name || 'Equipment',
+        quantity: qty,
+        pricePerDay,
+        deposit,
+        rentalTotal: pricePerDay * tripDurationDays * qty,
+        depositTotal: deposit * qty,
+      };
+    });
+
+  const rentalSubtotal = rentalItemsList.reduce((acc, curr) => acc + curr.rentalTotal, 0);
+  const depositSubtotal = rentalItemsList.reduce((acc, curr) => acc + curr.depositTotal, 0);
+  const grandTotal = tripSubtotal + rentalSubtotal + depositSubtotal;
+
+  const handleUpdateRentalQty = (rentalId: string, delta: number, maxStock = 20) => {
+    setSelectedRentals((prev) => {
+      const current = prev[rentalId] || 0;
+      const next = Math.max(0, Math.min(maxStock, current + delta));
+      return { ...prev, [rentalId]: next };
+    });
+  };
 
   const handleBookNow = () => {
+    const selectedRentalPayload = rentalItemsList.map(r => ({
+      rentalId: r.rentalId,
+      quantity: r.quantity,
+    }));
+
+    const params = new URLSearchParams({
+      tripId: trip._id,
+      date: selectedDate || trip.startDates[0] || '',
+      adults: adults.toString(),
+      children: children.toString(),
+      seniors: seniors.toString(),
+    });
+
+    if (selectedRentalPayload.length > 0) {
+      params.set('rentals', JSON.stringify(selectedRentalPayload));
+    }
+
     if (!isAuthenticated) {
       const event = new CustomEvent('openAuthModal', {
         detail: {
-          redirect: `/checkout?tripId=${trip._id}&date=${selectedDate || trip.startDates[0]}&adults=${adults}&children=${children}&seniors=${seniors}`,
+          redirect: `/checkout?${params.toString()}`,
         },
       });
       window.dispatchEvent(event);
       return;
     }
-    const params = new URLSearchParams({
-      tripId: trip._id,
-      date: selectedDate || trip.startDates[0],
-      adults: adults.toString(),
-      children: children.toString(),
-      seniors: seniors.toString(),
-    });
     router.push(`/checkout?${params.toString()}`);
   };
 
@@ -212,8 +353,22 @@ export default function TripDetailPage() {
         
         {/* ================= HERO HEADER ================= */}
         <header className="space-y-4">
-          <div className="inline-flex items-center gap-2 text-xs font-bold text-[#176B55] tracking-wider uppercase bg-[#176B55]/10 border border-[#176B55]/20 px-3.5 py-1 rounded-full">
-            <TbMapPin size={14} className="text-[#52C7B0]" /> {trip.destination}
+          <div className="flex items-center justify-between gap-4">
+            <div className="inline-flex items-center gap-2 text-xs font-bold text-[#176B55] tracking-wider uppercase bg-[#176B55]/10 border border-[#176B55]/20 px-3.5 py-1 rounded-full">
+              <TbMapPin size={14} className="text-[#52C7B0]" /> {trip.destination}
+            </div>
+            <button
+              type="button"
+              onClick={handleToggleWishlist}
+              className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all border shadow-xs ${
+                isSaved
+                  ? 'bg-rose-50 border-rose-200 text-rose-600 hover:bg-rose-100'
+                  : 'bg-white border-[#E5E9E5] text-[#172B2A] hover:bg-slate-50'
+              }`}
+            >
+              <TbHeart size={16} className={isSaved ? 'fill-rose-500 text-rose-500' : 'text-[#697773]'} />
+              <span>{isSaved ? 'Saved to Wishlist' : 'Save to Wishlist'}</span>
+            </button>
           </div>
 
           <h1 className="text-3xl sm:text-5xl font-black text-[#172B2A] tracking-tight leading-tight">
@@ -320,7 +475,7 @@ export default function TripDetailPage() {
             {/* Elegant Tab Navigation */}
             <div className="sticky top-16 z-20 bg-[#F7F7F2]/90 backdrop-blur-md pt-3 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0">
               <div className="flex overflow-x-auto border-b border-[#E5E9E5] scrollbar-none gap-2">
-                {(['overview', 'itinerary', 'included', 'reviews'] as const).map((tab) => (
+                {(['overview', 'itinerary', 'rentals', 'included', 'reviews'] as const).map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
@@ -330,7 +485,7 @@ export default function TripDetailPage() {
                         : 'border-transparent text-[#697773] hover:text-[#172B2A]'
                     }`}
                   >
-                    {tab === 'included' ? 'Inclusions' : tab}
+                    {tab === 'included' ? 'Inclusions' : tab === 'rentals' ? `Rentals (${rentals.length})` : tab}
                     {tab === 'reviews' && reviews.length > 0 && (
                       <span className="ml-1.5 text-xs text-[#697773]">({reviews.length})</span>
                     )}
@@ -367,52 +522,268 @@ export default function TripDetailPage() {
                     </div>
                   </div>
 
-                  {/* AI Safety Advisory */}
-                  <div className="p-6 sm:p-8 rounded-3xl border border-[#176B55]/25 bg-gradient-to-br from-white to-[#176B55]/5 shadow-sm space-y-4">
+                  {/* Optional Rental Equipment from Agency */}
+                  {rentals.length > 0 && (
+                    <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#176B55]/20 shadow-sm space-y-5">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div>
+                          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#176B55]/10 text-[#176B55] text-xs font-bold mb-2">
+                            <TbPackage size={14} /> Same-Agency Equipment
+                          </div>
+                          <h3 className="text-xl font-black text-[#172B2A]">Optional Rental Gear for This Trip</h3>
+                          <p className="text-xs text-[#697773]">
+                            Book gear directly with {trip.agency?.name}. Rental dates automatically align with your {tripDurationDays}-day journey ({selectedDate ? new Date(selectedDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : 'start date'} to departure).
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('rentals')}
+                          className="text-xs font-bold text-[#176B55] hover:underline self-start sm:self-auto"
+                        >
+                          View all ({rentals.length}) &rarr;
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {rentals.slice(0, 4).map((r) => {
+                          const rId = r.id || r._id;
+                          const currentQty = selectedRentals[rId] || 0;
+                          const itemRentalTotal = Number(r.pricePerDay || 0) * tripDurationDays;
+                          return (
+                            <div key={rId} className={`p-3.5 rounded-2xl border transition-all ${currentQty > 0 ? 'border-[#176B55] bg-[#176B55]/5 shadow-xs' : 'border-[#E5E9E5] bg-[#F7F7F2]'}`}>
+                              <div className="flex items-center gap-3">
+                                <div className="w-14 h-14 rounded-xl overflow-hidden bg-muted flex-shrink-0 relative">
+                                  <img
+                                    src={getRentalImage(r)}
+                                    alt={r.title || r.name}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=800&q=80';
+                                    }}
+                                  />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted">{r.category || 'Gear'}</span>
+                                  <h4 className="font-bold text-sm text-[#172B2A] truncate">{r.title || r.name}</h4>
+                                  <p className="text-xs text-[#176B55] font-extrabold mt-0.5">
+                                    ₹{Number(r.pricePerDay || 0).toLocaleString()} <span className="text-[10px] font-normal text-muted">/ day</span>
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-1.5 bg-white rounded-xl border border-[#E5E9E5] p-1 shadow-2xs">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateRentalQty(rId, -1)}
+                                    disabled={currentQty === 0}
+                                    className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold text-[#172B2A] hover:bg-muted disabled:opacity-30"
+                                  >
+                                    -
+                                  </button>
+                                  <span className="w-5 text-center text-xs font-bold text-[#172B2A]">{currentQty}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateRentalQty(rId, 1, r.stock || 20)}
+                                    className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold text-[#172B2A] hover:bg-muted"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Essential Travel & Agency Notes */}
+                  <div className="p-6 sm:p-8 rounded-3xl border border-[#E5E9E5] bg-white shadow-sm space-y-4">
                     <div className="flex items-start gap-4">
-                      <div className="p-3 rounded-2xl bg-[#176B55] text-white shadow-md shadow-[#176B55]/20 flex-shrink-0">
-                        <TbShieldCheck size={24} className="text-[#52C7B0]" />
+                      <div className="p-3 rounded-2xl bg-[#176B55]/10 text-[#176B55] flex-shrink-0">
+                        <TbShieldCheck size={24} />
                       </div>
                       <div className="flex-1 space-y-2">
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-base sm:text-lg font-bold text-[#172B2A]">VOYNEX Smart Safety Advisory</h3>
-                          <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-[#176B55]/10 text-[#176B55]">
-                            Verified
-                          </span>
-                        </div>
+                        <h3 className="text-base sm:text-lg font-bold text-[#172B2A]">Essential Travel Notes</h3>
                         <p className="text-xs text-[#697773]">
-                          Status: <span className="text-[#176B55] font-bold">Optimal for Travel</span> &bull; Updated within the last 24 hours.
+                          Provided by {trip.agency?.name || 'the organizing agency'} for this journey.
                         </p>
 
                         <ul className="space-y-2 pt-2">
                           <li className="flex items-center gap-2 text-xs font-semibold text-[#172B2A]">
-                            <TbCheck className="text-[#176B55]" /> Valid photo ID required upon arrival
+                            <TbCheck className="text-[#176B55]" /> Valid government-issued photo ID required for all travelers
                           </li>
                           <li className="flex items-center gap-2 text-xs font-semibold text-[#172B2A]">
-                            <TbCheck className="text-[#176B55]" /> Full guided security & acclimatization support included
+                            <TbCheck className="text-[#176B55]" /> Check-in point and itinerary schedule coordinated directly with agency
                           </li>
-                          <li className="flex items-center gap-2 text-xs font-semibold text-amber-700">
-                            <TbAlertTriangle className="text-amber-500" /> Layered thermal wear recommended for evening hours
+                          <li className="flex items-center gap-2 text-xs font-semibold text-[#172B2A]">
+                            <TbAlertTriangle className="text-amber-500" /> Weather-appropriate footwear and clothing recommended for {trip.destination}
                           </li>
                         </ul>
                       </div>
                     </div>
                   </div>
 
-                  {/* Location Map View */}
-                  <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#E5E9E5] shadow-sm space-y-4">
-                    <h2 className="text-xl font-black text-[#172B2A]">Destination Coordinates</h2>
-                    <div className="h-[280px] rounded-2xl border border-[#E5E9E5] bg-[#F7F7F2] flex flex-col items-center justify-center text-center p-6 space-y-2">
-                      <div className="p-3 rounded-2xl bg-white shadow-sm border border-[#E5E9E5]">
-                        <TbMapPin size={32} className="text-[#176B55]" />
+                  {/* Usable Map View & Meeting Point */}
+                  <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#E5E9E5] shadow-sm space-y-5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <h2 className="text-xl font-black text-[#172B2A]">Destination & Meeting Location</h2>
+                        <p className="text-xs text-[#697773] mt-0.5">Accurate coordinates and assembly guidance</p>
                       </div>
-                      <p className="font-bold text-sm text-[#172B2A]">{trip.destination}</p>
-                      <p className="text-xs text-[#697773] max-w-sm">
-                        Curated starting point coordinates and airport transfer routes will be synchronized with your booking pass.
-                      </p>
+                      {trip.coordinates?.lat && trip.coordinates?.lng ? (
+                        <a
+                          href={`https://www.google.com/maps/search/?api=1&query=${trip.coordinates.lat},${trip.coordinates.lng}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#176B55]/10 text-[#176B55] hover:bg-[#176B55]/20 text-xs font-bold transition-all self-start sm:self-auto"
+                        >
+                          <TbExternalLink size={15} /> Open in Google Maps
+                        </a>
+                      ) : (
+                        <a
+                          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(trip.destination)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#176B55]/10 text-[#176B55] hover:bg-[#176B55]/20 text-xs font-bold transition-all self-start sm:self-auto"
+                        >
+                          <TbExternalLink size={15} /> Search on Maps
+                        </a>
+                      )}
                     </div>
+
+                    {trip.meetingPoint && (trip.meetingPoint.name || trip.meetingPoint.address) && (
+                      <div className="p-4 rounded-2xl bg-[#F7F7F2] border border-[#E5E9E5] flex items-start gap-3">
+                        <div className="p-2.5 rounded-xl bg-white border border-[#E5E9E5] text-[#176B55]">
+                          <TbMapPin size={20} />
+                        </div>
+                        <div className="flex-1 text-xs space-y-0.5">
+                          <span className="font-bold uppercase tracking-wider text-[10px] text-[#176B55]">Meeting Point</span>
+                          <p className="font-bold text-sm text-[#172B2A]">{trip.meetingPoint.name || trip.destination}</p>
+                          {trip.meetingPoint.address && <p className="text-[#697773]">{trip.meetingPoint.address}</p>}
+                        </div>
+                      </div>
+                    )}
+
+                    {trip.coordinates?.lat && trip.coordinates?.lng ? (
+                      <div className="space-y-2">
+                        <div className="h-[320px] rounded-2xl overflow-hidden border border-[#E5E9E5] shadow-inner bg-slate-100 relative">
+                          <iframe
+                            title="OpenStreetMap"
+                            width="100%"
+                            height="100%"
+                            frameBorder="0"
+                            scrolling="no"
+                            marginHeight={0}
+                            marginWidth={0}
+                            src={`https://www.openstreetmap.org/export/embed.html?bbox=${Number(trip.coordinates.lng) - 0.05}%2C${Number(trip.coordinates.lat) - 0.04}%2C${Number(trip.coordinates.lng) + 0.05}%2C${Number(trip.coordinates.lat) + 0.04}&layer=mapnik&marker=${trip.coordinates.lat}%2C${trip.coordinates.lng}`}
+                            className="w-full h-full"
+                          />
+                        </div>
+                        <p className="text-[11px] text-[#697773] text-right">
+                          Map data &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" className="underline">OpenStreetMap</a> contributors
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="rounded-2xl border border-dashed border-[#E5E9E5] bg-[#F7F7F2] p-8 text-center space-y-3">
+                        <div className="w-12 h-12 rounded-2xl bg-white border border-[#E5E9E5] text-[#176B55] flex items-center justify-center mx-auto shadow-xs">
+                          <TbMapPin size={24} />
+                        </div>
+                        <div>
+                          <p className="font-bold text-[#172B2A] text-sm">{trip.destination}</p>
+                          <p className="text-xs text-[#697773] max-w-md mx-auto mt-1">
+                            Exact starting coordinates are confirmed with your agency before travel. Use the map link above to inspect the general region.
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </motion.div>
+              )}
+
+              {/* TAB: RENTALS */}
+              {activeTab === 'rentals' && (
+                <div className="space-y-6">
+                  <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#E5E9E5] shadow-sm">
+                    <h3 className="text-xl font-bold text-[#172B2A] mb-2">Equipment & Rental Gear</h3>
+                    <p className="text-xs text-[#697773] mb-6">
+                      Reserve optional equipment directly provided by {trip.agency?.name}. Selected items will be synchronized with your trip reservation.
+                    </p>
+
+                    {rentals.length > 0 ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {rentals.map((r) => {
+                          const rId = r.id || r._id;
+                          const currentQty = selectedRentals[rId] || 0;
+                          const itemRentalTotal = Number(r.pricePerDay || 0) * tripDurationDays;
+                          return (
+                            <div key={rId} className={`rounded-2xl border overflow-hidden transition-all flex flex-col justify-between ${currentQty > 0 ? 'border-[#176B55] bg-[#176B55]/5 shadow-sm' : 'border-[#E5E9E5] bg-card'}`}>
+                              <div>
+                                <div className="h-44 w-full bg-muted relative overflow-hidden">
+                                  <img
+                                    src={getRentalImage(r)}
+                                    alt={r.title || r.name}
+                                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                                    onError={(e) => {
+                                      (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=800&q=80';
+                                    }}
+                                  />
+                                  <span className="absolute top-3 left-3 px-2.5 py-0.5 rounded-full bg-black/60 backdrop-blur-md text-white text-[10px] font-bold uppercase tracking-wider">
+                                    {r.category || 'Gear'}
+                                  </span>
+                                  {currentQty > 0 && (
+                                    <span className="absolute top-3 right-3 px-2.5 py-0.5 rounded-full bg-[#176B55] text-white text-[10px] font-bold">
+                                      {currentQty} selected
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="p-5">
+                                  <h4 className="font-bold text-base text-[#172B2A]">{r.title || r.name}</h4>
+                                  {r.description && <p className="text-xs text-[#697773] mt-1 line-clamp-2">{r.description}</p>}
+                                </div>
+                              </div>
+                              <div className="p-5 pt-0">
+                                <div className="flex items-center justify-between pt-3 border-t border-[#E5E9E5]/60">
+                                  <div>
+                                    <p className="text-sm font-black text-[#176B55]">
+                                      ₹{Number(r.pricePerDay || 0).toLocaleString()} <span className="text-[10px] font-normal text-muted">/ day</span>
+                                    </p>
+                                    <p className="text-[10px] text-muted">
+                                      ₹{itemRentalTotal.toLocaleString()} for {tripDurationDays}d trip
+                                      {Number(r.deposit || 0) > 0 && ` • ₹${Number(r.deposit).toLocaleString()} deposit`}
+                                    </p>
+                                  </div>
+                                  <div className="flex items-center gap-2 bg-white rounded-xl border border-[#E5E9E5] p-1.5 shadow-2xs">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleUpdateRentalQty(rId, -1)}
+                                      disabled={currentQty === 0}
+                                      className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold text-[#172B2A] hover:bg-muted disabled:opacity-30"
+                                    >
+                                      -
+                                    </button>
+                                    <span className="w-6 text-center text-xs font-bold text-[#172B2A]">{currentQty}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleUpdateRentalQty(rId, 1, r.stock || 20)}
+                                      className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold text-[#172B2A] hover:bg-muted"
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-center py-12 border border-dashed border-[#E5E9E5] rounded-2xl">
+                        <TbPackage size={36} className="mx-auto text-muted mb-2 opacity-50" />
+                        <p className="text-sm font-bold text-[#172B2A]">No Equipment Available</p>
+                        <p className="text-xs text-[#697773] mt-1">This agency does not currently have rental items listed for this trip.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
               )}
 
               {/* TAB 2: ITINERARY */}
@@ -633,12 +1004,24 @@ export default function TripDetailPage() {
               {/* Price Calculation */}
               <div className="border-t border-[#E5E9E5] pt-4 space-y-2 text-xs">
                 <div className="flex justify-between text-[#697773]">
-                  <span>₹{trip.price.toLocaleString()} &times; {totalGuests} guests</span>
-                  <span className="font-semibold text-[#172B2A]">₹{totalPrice.toLocaleString()}</span>
+                  <span>Trip ({trip.price.toLocaleString()} &times; {totalGuests})</span>
+                  <span className="font-semibold text-[#172B2A]">₹{tripSubtotal.toLocaleString()}</span>
                 </div>
-                <div className="flex justify-between font-black text-sm text-[#172B2A] pt-1 border-t border-[#E5E9E5]/60">
-                  <span>Total Due</span>
-                  <span className="text-[#176B55] text-base">₹{totalPrice.toLocaleString()}</span>
+                {rentalSubtotal > 0 && (
+                  <div className="flex justify-between text-[#697773]">
+                    <span>Optional Gear ({rentalItemsList.reduce((s, i) => s + i.quantity, 0)} items)</span>
+                    <span className="font-semibold text-[#172B2A]">₹{rentalSubtotal.toLocaleString()}</span>
+                  </div>
+                )}
+                {depositSubtotal > 0 && (
+                  <div className="flex justify-between text-[#697773]">
+                    <span>Security Deposit (Refundable)</span>
+                    <span className="font-semibold text-[#172B2A]">₹{depositSubtotal.toLocaleString()}</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-black text-sm text-[#172B2A] pt-2 border-t border-[#E5E9E5]/60">
+                  <span>Grand Total</span>
+                  <span className="text-[#176B55] text-base">₹{grandTotal.toLocaleString()}</span>
                 </div>
               </div>
 
@@ -650,17 +1033,32 @@ export default function TripDetailPage() {
                   Your Listed Journey
                 </div>
               ) : (
-                <button
-                  type="button"
-                  onClick={handleBookNow}
-                  className="w-full py-4 rounded-2xl bg-[#176B55] hover:bg-[#135946] text-white font-extrabold text-sm shadow-md shadow-[#176B55]/20 active:scale-[0.99] transition-all cursor-pointer"
-                >
-                  Confirm & Reserve Journey
-                </button>
+                <div className="flex gap-2.5">
+                  <button
+                    type="button"
+                    onClick={handleBookNow}
+                    className="flex-1 py-4 rounded-2xl bg-[#176B55] hover:bg-[#135946] text-white font-extrabold text-sm shadow-md shadow-[#176B55]/20 active:scale-[0.99] transition-all cursor-pointer"
+                  >
+                    Confirm & Reserve Journey
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleToggleWishlist}
+                    className={`px-4 rounded-2xl border transition-all flex items-center justify-center ${
+                      isSaved
+                        ? 'bg-rose-50 border-rose-200 text-rose-600'
+                        : 'bg-white border-[#E5E9E5] text-[#697773] hover:text-[#172B2A] hover:bg-[#F7F7F2]'
+                    }`}
+                    title={isSaved ? 'Saved in Wishlist' : 'Save to Wishlist'}
+                    aria-label="Wishlist"
+                  >
+                    <TbHeart size={20} className={isSaved ? 'fill-rose-500 text-rose-500' : ''} />
+                  </button>
+                </div>
               )}
 
               <p className="text-[11px] font-semibold text-[#697773] text-center flex items-center justify-center gap-1.5 pt-1">
-                <TbCheck className="text-[#176B55]" size={14} /> Free cancellation up to 48 hours before departure
+                <TbCheck className="text-[#176B55]" size={14} /> Cancellations and refunds subject to agency booking policy
               </p>
             </motion.div>
           </aside>
@@ -673,7 +1071,7 @@ export default function TripDetailPage() {
         <div className="flex items-center justify-between gap-4 max-w-7xl mx-auto">
           <div>
             <div className="text-[11px] text-[#697773] font-bold uppercase tracking-wider">Total Investment</div>
-            <div className="font-black text-lg text-[#176B55]">₹{totalPrice.toLocaleString()}</div>
+            <div className="font-black text-lg text-[#176B55]">₹{grandTotal.toLocaleString()}</div>
           </div>
 
           {((user as any)?.organizationId || (user as any)?.organization_id) &&

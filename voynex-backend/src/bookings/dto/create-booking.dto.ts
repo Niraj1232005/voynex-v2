@@ -1,4 +1,25 @@
-import { IsDateString, IsNotEmpty, IsNumber, IsOptional, IsPositive, IsString, Min } from 'class-validator';
+import {
+  IsDateString,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsPositive,
+  IsString,
+  Min,
+  IsArray,
+  ValidateNested,
+} from 'class-validator';
+import { Type } from 'class-transformer';
+
+export class BookingRentalItemDto {
+  @IsString()
+  @IsNotEmpty()
+  rentalId: string;
+
+  @IsNumber()
+  @Min(1)
+  quantity: number;
+}
 
 export class CreateBookingDto {
   @IsOptional()
@@ -35,4 +56,10 @@ export class CreateBookingDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => BookingRentalItemDto)
+  rentals?: BookingRentalItemDto[];
 }

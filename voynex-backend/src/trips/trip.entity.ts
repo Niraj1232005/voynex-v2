@@ -23,6 +23,12 @@ export class Trip {
   @Column()
   destination: string;
 
+  @Column({ type: 'jsonb', nullable: true })
+  coordinates?: { lat: number; lng: number };
+
+  @Column({ type: 'jsonb', nullable: true })
+  meetingPoint?: { name: string; address?: string; coordinates?: { lat: number; lng: number } };
+
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   price: number;
 

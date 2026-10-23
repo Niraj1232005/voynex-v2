@@ -81,6 +81,8 @@ export class UpdateRentalDto {
   location?: string;
 }
 
+import { Organization } from '../organizations/organization.entity';
+
 @Injectable()
 export class RentalsService {
   constructor(
@@ -88,7 +90,19 @@ export class RentalsService {
     private rentalsRepository: Repository<Rental>,
     @InjectRepository(Booking)
     private bookingsRepository: Repository<Booking>,
+    @InjectRepository(Organization)
+    private organizationsRepository: Repository<Organization>,
   ) {}
+
+  private async verifyApprovedOrganization(organizationId: string) {
+    const org = await this.organizationsRepository.findOne({ where: { id: organizationId } });
+    if (!org) {
+      throw new NotFoundException('Organization not found');
+    }
+    if (!org.isApproved || org.status === 'rejected') {
+      throw new ForbiddenException('Your agency account is awaiting platform admin approval.');
+    }
+  }
 
   normalizeRental(rental: any): any {
     if (!rental) return null;
@@ -101,6 +115,8 @@ export class RentalsService {
   }
 
   async create(organizationId: string, userId: string, dto: CreateRentalDto) {
+    await this.verifyApprovedOrganization(organizationId);
+
     const rental = this.rentalsRepository.create({
       ...dto,
       organizationId,
@@ -112,13 +128,17 @@ export class RentalsService {
     return this.normalizeRental(saved);
   }
 
-  async findAll(query?: { category?: string; location?: string; search?: string }) {
+  async findAll(query?: { category?: string; location?: string; search?: string; organizationId?: string }) {
     const qb = this.rentalsRepository.createQueryBuilder('rental')
       .leftJoinAndSelect('rental.organization', 'organization')
       .orderBy('rental.createdAt', 'DESC');
 
     if (query?.category) {
       qb.andWhere('LOWER(rental.category) = LOWER(:category)', { category: query.category });
+    }
+
+    if (query?.organizationId) {
+      qb.andWhere('rental.organizationId = :organizationId', { organizationId: query.organizationId });
     }
 
     if (query?.location) {
@@ -153,6 +173,7 @@ export class RentalsService {
   }
 
   async update(id: string, organizationId: string, dto: UpdateRentalDto) {
+    await this.verifyApprovedOrganization(organizationId);
     const rental = await this.rentalsRepository.findOne({ where: { id } });
     if (!rental) throw new NotFoundException('Rental item not found');
     if (rental.organizationId !== organizationId) {
@@ -168,6 +189,7 @@ export class RentalsService {
   }
 
   async remove(id: string, organizationId: string) {
+    await this.verifyApprovedOrganization(organizationId);
     const rental = await this.rentalsRepository.findOne({ where: { id } });
     if (!rental) throw new NotFoundException('Rental item not found');
     if (rental.organizationId !== organizationId) {

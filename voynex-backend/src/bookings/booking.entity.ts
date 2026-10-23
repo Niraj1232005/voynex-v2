@@ -41,6 +41,29 @@ export class Booking {
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   totalAmount: number;
 
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  tripAmount: number;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  rentalAmount: number;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  depositAmount: number;
+
+  @Column({ type: 'jsonb', nullable: true })
+  rentals: Array<{
+    rentalId: string;
+    title: string;
+    quantity: number;
+    pricePerDay: number;
+    deposit: number;
+    daysCount: number;
+    totalAmount: number;
+  }>;
+
+  @Column({ type: 'jsonb', nullable: true })
+  itinerarySnapshot: any[];
+
   @Column({ default: 'pending' })
   paymentStatus: string;
 

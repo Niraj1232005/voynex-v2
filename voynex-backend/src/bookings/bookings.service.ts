@@ -29,6 +29,11 @@ export class BookingsService {
       startDate: booking.travelDate,
       guests: booking.travelersCount,
       totalPrice: Number(booking.totalAmount),
+      tripAmount: Number(booking.tripAmount || (booking.tripId ? booking.totalAmount : 0)),
+      rentalAmount: Number(booking.rentalAmount || 0),
+      depositAmount: Number(booking.depositAmount || 0),
+      rentals: booking.rentals || [],
+      itinerary: booking.itinerarySnapshot || booking.trip?.itinerary || [],
       groupComposition: {
         adults: booking.adultsCount || booking.travelersCount || 1,
         children: booking.childrenCount || 0,
@@ -83,6 +88,62 @@ export class BookingsService {
     const seniors = dto.seniorsCount || 0;
     const travelersCount = adults + children + seniors;
 
+    const tripAmount = Number(trip.price) * travelersCount;
+    const durationDays = trip.durationDays || trip.duration || 1;
+
+    // Process and validate rental selections
+    const processedRentals: any[] = [];
+    let rentalAmount = 0;
+    let depositAmount = 0;
+
+    if (dto.rentals && dto.rentals.length > 0) {
+      for (const item of dto.rentals) {
+        if (!item.rentalId) {
+          throw new BadRequestException('rentalId is required for each selected rental item');
+        }
+        const rental = await this.bookingsRepository.manager.findOne(Rental, {
+          where: { id: item.rentalId },
+        });
+
+        if (!rental) {
+          throw new NotFoundException(`Rental equipment with ID ${item.rentalId} not found`);
+        }
+
+        if (rental.organizationId !== trip.organizationId) {
+          throw new BadRequestException(
+            `Rental item "${rental.title}" belongs to a different agency. Rentals must belong to the trip agency.`,
+          );
+        }
+
+        if (rental.isAvailable === false) {
+          throw new BadRequestException(`Rental item "${rental.title}" is currently unavailable.`);
+        }
+
+        const quantity = Math.max(1, Math.min(20, Math.floor(Number(item.quantity) || 1)));
+        const pricePerDay = Number(rental.pricePerDay || 0);
+        const itemDeposit = Number(rental.deposit || 0);
+
+        const itemRentalTotal = pricePerDay * durationDays * quantity;
+        const itemDepositTotal = itemDeposit * quantity;
+
+        rentalAmount += itemRentalTotal;
+        depositAmount += itemDepositTotal;
+
+        processedRentals.push({
+          rentalId: rental.id,
+          title: rental.title,
+          category: rental.category,
+          quantity,
+          pricePerDay,
+          deposit: itemDeposit,
+          daysCount: durationDays,
+          totalAmount: itemRentalTotal + itemDepositTotal,
+        });
+      }
+    }
+
+    const totalAmount = tripAmount + rentalAmount + depositAmount;
+
     const booking = this.bookingsRepository.create({
       userId,
       tripId: dto.tripId,
@@ -93,7 +154,12 @@ export class BookingsService {
       seniorsCount: seniors,
       travelDate: dto.travelDate,
       notes: dto.notes,
-      totalAmount: Number(trip.price) * travelersCount,
+      tripAmount,
+      rentalAmount,
+      depositAmount,
+      totalAmount,
+      rentals: processedRentals.length > 0 ? processedRentals : undefined,
+      itinerarySnapshot: trip.itinerary || [],
       status: 'pending',
       paymentStatus: 'pending',
     });
@@ -233,6 +299,21 @@ export class BookingsService {
     bookingObj.status = 'cancelled';
     await this.bookingsRepository.save(bookingObj);
     return { message: 'Booking cancelled successfully' };
+  }
+
+  async remove(id: string, user: any): Promise<{ message: string }> {
+    const booking = await this.bookingsRepository.findOne({ where: { id } });
+    if (!booking) {
+      throw new NotFoundException('Booking not found');
+    }
+    if (user.role === 'user' && booking.userId !== user.sub) {
+      throw new ForbiddenException('You do not have permission to delete this booking');
+    }
+    if (booking.paymentStatus === 'paid') {
+      throw new BadRequestException('Paid bookings cannot be deleted directly.');
+    }
+    await this.bookingsRepository.remove(booking);
+    return { message: 'Booking deleted successfully' };
   }
 
   async updateStatus(

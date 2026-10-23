@@ -2,14 +2,16 @@
 import React, { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { TbCheck, TbMapPin, TbCalendarEvent, TbReceipt, TbArrowRight, TbHome, TbAlertCircle } from 'react-icons/tb';
+import { TbCheck, TbMapPin, TbCalendarEvent, TbReceipt, TbArrowRight, TbHome, TbAlertCircle, TbPackage } from 'react-icons/tb';
 import { useToast } from '@/contexts/ToastContext';
+import { api } from '@/lib/api';
 
 function BookingSuccessContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { showToast } = useToast();
   const [mounted, setMounted] = useState(false);
+  const [bookingDetails, setBookingDetails] = useState<any>(null);
 
   const bookingId = searchParams.get('bookingId');
   const destination = searchParams.get('destination');
@@ -19,6 +21,14 @@ function BookingSuccessContent() {
     setMounted(true);
     if (bookingId) {
       showToast('Booking successfully confirmed!', 'success');
+      api.get('/bookings')
+        .then((res: any) => {
+          if (Array.isArray(res)) {
+            const found = res.find((b: any) => (b._id === bookingId || b.id === bookingId));
+            if (found) setBookingDetails(found);
+          }
+        })
+        .catch((err) => console.warn('Could not load booking details for receipt:', err));
     }
   }, [bookingId, showToast]);
 
@@ -79,12 +89,37 @@ function BookingSuccessContent() {
                 </div>
                 <div className="flex items-center justify-between border-b border-border/50 pb-4">
                   <span className="text-muted font-medium flex items-center gap-2"><TbMapPin /> Destination</span>
-                  <span className="font-bold">{destination || 'Your Trip Package'}</span>
+                  <span className="font-bold">{bookingDetails?.trip?.title || destination || 'Your Trip Package'}</span>
                 </div>
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between border-b border-border/50 pb-4">
                   <span className="text-muted font-medium flex items-center gap-2"><TbCalendarEvent /> Dates</span>
-                  <span className="font-bold">{date ? new Date(date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Flexible'}</span>
+                  <span className="font-bold">{date || bookingDetails?.travelDate ? new Date(date || bookingDetails?.travelDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Flexible'}</span>
                 </div>
+
+                {bookingDetails?.rentals && Array.isArray(bookingDetails.rentals) && bookingDetails.rentals.length > 0 && (
+                  <div className="border-b border-border/50 pb-4 space-y-2">
+                    <span className="text-xs font-bold text-muted uppercase tracking-wider flex items-center gap-1.5">
+                      <TbPackage /> Optional Rental Equipment
+                    </span>
+                    <div className="space-y-1.5 pl-2">
+                      {bookingDetails.rentals.map((r: any, idx: number) => (
+                        <div key={idx} className="flex justify-between text-xs">
+                          <span>🎒 {r.title} &times; {r.quantity}</span>
+                          <span className="font-bold font-mono">₹{Number(r.totalAmount || (r.pricePerDay * (r.daysCount || 1) * r.quantity) || 0).toLocaleString()}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {bookingDetails && (
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-muted font-bold text-sm">Total Paid</span>
+                    <span className="font-black text-xl text-primary font-mono">
+                      ₹{Number(bookingDetails.totalAmount || bookingDetails.totalPrice || 0).toLocaleString()}
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-col sm:flex-row gap-4 justify-center">

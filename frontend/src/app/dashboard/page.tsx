@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { FiMapPin, FiCalendar, FiUsers, FiStar, FiArrowRight, FiHeart, FiSettings, FiShoppingBag } from 'react-icons/fi';
+import { FiMapPin, FiCalendar, FiUsers, FiStar, FiArrowRight, FiHeart, FiUser, FiShoppingBag } from 'react-icons/fi';
 import { useAuth } from '@/contexts/AuthContext';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import Breadcrumbs from '@/components/Breadcrumbs';
@@ -52,8 +52,8 @@ function DashboardContent() {
               <h1 className="text-3xl font-bold">Welcome back, {(user as any)?.firstName || user?.name || 'Traveler'} 👋</h1>
               <p className="text-muted mt-1">Manage your bookings, saved trips, and travel preferences</p>
             </div>
-            <Link href="/account" className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border bg-card text-sm font-semibold hover:bg-muted/40 transition-all">
-              <FiSettings size={16} /> Account Settings
+            <Link href="/profile" className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border bg-card text-sm font-semibold hover:bg-muted/40 transition-all">
+              <FiUser size={16} /> Edit Profile
             </Link>
           </motion.div>
 

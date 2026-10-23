@@ -127,20 +127,53 @@ function TripsContent() {
   }, []);
 
   useEffect(() => {
+    let localSaved: string[] = [];
     try {
       const saved = localStorage.getItem('voynex_saved_trips');
-      if (saved) setSavedTrips(JSON.parse(saved));
+      if (saved) localSaved = JSON.parse(saved);
+      if (Array.isArray(localSaved)) setSavedTrips(localSaved);
     } catch (e) {}
+
+    api.get('/wishlist')
+      .then(async (res) => {
+        if (Array.isArray(res)) {
+          const remoteIds = res.map((w: any) => w.itemId || w.item?._id || w.item?.id).filter(Boolean);
+          const missing = localSaved.filter(id => !remoteIds.includes(id));
+          if (missing.length > 0) {
+            await Promise.allSettled(missing.map(id => api.post('/wishlist', { itemType: 'trip', itemId: id })));
+            const reRes = await api.get('/wishlist').catch(() => []);
+            if (Array.isArray(reRes)) {
+              const allIds = reRes.map((w: any) => w.itemId || w.item?._id || w.item?.id).filter(Boolean);
+              setSavedTrips(allIds);
+              localStorage.setItem('voynex_saved_trips', JSON.stringify(allIds));
+              return;
+            }
+          }
+          const merged = Array.from(new Set([...localSaved, ...remoteIds]));
+          setSavedTrips(merged);
+          localStorage.setItem('voynex_saved_trips', JSON.stringify(merged));
+        }
+      })
+      .catch(() => {});
   }, []);
 
-  const toggleSaved = (e: React.MouseEvent, id: string) => {
+  const toggleSaved = async (e: React.MouseEvent, id: string) => {
     e.preventDefault();
     e.stopPropagation();
     const isSaved = savedTrips.includes(id);
     const updated = isSaved ? savedTrips.filter((t) => t !== id) : [...savedTrips, id];
     setSavedTrips(updated);
     localStorage.setItem('voynex_saved_trips', JSON.stringify(updated));
-    showToast(isSaved ? 'Removed from wishlist' : 'Saved to wishlist!', 'success');
+
+    try {
+      const res = await api.post('/wishlist', {
+        itemType: 'trip',
+        itemId: id,
+      });
+      showToast(res?.message || (isSaved ? 'Removed from wishlist' : 'Saved to wishlist!'), 'success');
+    } catch {
+      showToast(isSaved ? 'Removed from saved trips' : 'Saved to wishlist!', 'success');
+    }
   };
 
   const toggleFilter = (type: string, value: string) => {

@@ -14,6 +14,15 @@ export class UsersController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Post('apply-agency')
+  applyAgency(
+    @CurrentUser('sub') userId: string,
+    @Body('organizationName') organizationName: string,
+  ) {
+    return this.usersService.applyAgency(userId, organizationName);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Get('profile')
   getProfile(@CurrentUser('sub') userId: string) {
     return this.usersService.findById(userId);

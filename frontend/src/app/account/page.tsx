@@ -2,7 +2,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { FiUser, FiUserPlus, FiSettings, FiArrowRight } from 'react-icons/fi';
+import { FiUser, FiUserPlus, FiCalendar, FiArrowRight } from 'react-icons/fi';
 import Breadcrumbs from '@/components/Breadcrumbs';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -13,18 +13,18 @@ export default function AccountPage() {
 
   const subFeatures = isAuthenticated ? [
     {
-      href: '/dashboard',
+      href: '/profile',
       icon: FiUser,
-      title: 'Profile',
-      description: 'View your profile, preferences, and travel history.',
+      title: 'Profile Settings',
+      description: 'Update your personal details, phone number, and contact info.',
       color: 'from-blue-500 to-indigo-600',
     },
     {
-      href: '/dashboard',
-      icon: FiSettings,
-      title: 'Settings',
-      description: 'Manage account settings, notifications, and privacy.',
-      color: 'from-slate-500 to-gray-600',
+      href: '/my-trips',
+      icon: FiCalendar,
+      title: 'My Bookings',
+      description: 'View your upcoming trips, rentals, and booking receipts.',
+      color: 'from-emerald-500 to-teal-600',
     },
   ] : [
     {

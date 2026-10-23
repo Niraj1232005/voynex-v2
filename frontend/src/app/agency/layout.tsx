@@ -47,23 +47,51 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (organization && !organization.isApproved) {
+  if (organization && organization.status === 'rejected') {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] w-full px-4 text-center">
+        <div className="max-w-md p-8 rounded-3xl border border-red-500/20 bg-card shadow-2xl relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-red-500/5 to-rose-500/5 pointer-events-none" />
+          <div className="h-16 w-16 bg-red-500/10 text-red-500 rounded-2xl flex items-center justify-center text-3xl mb-6 mx-auto">🚫</div>
+          <h2 className="text-2xl font-bold mb-3 text-red-500">Application Not Approved</h2>
+          <p className="text-sm text-muted leading-relaxed mb-6">
+            Your application for <strong>{organization.name}</strong> was reviewed by our team and was not approved at this time.
+          </p>
+          <div className="p-4 rounded-xl bg-surface-hover border border-border/50 text-xs text-muted text-left mb-6">
+            <p className="font-semibold mb-1">Status:</p>
+            <p className="text-red-500 font-bold">Rejected by Platform Administrator</p>
+            <p className="mt-2 text-[11px] text-muted">
+              If you believe this decision was made in error or would like to submit updated verification documents, please reach out to admin@voynex.com.
+            </p>
+          </div>
+          <button onClick={() => logout()} className="px-6 py-2.5 rounded-xl border border-border hover:bg-surface-hover font-semibold text-sm transition-all tap-target flex items-center justify-center gap-2 mx-auto">
+            <FiLogOut /> Logout
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!organization || !organization.isApproved) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] w-full px-4 text-center">
         <div className="max-w-md p-8 rounded-3xl border border-border bg-card shadow-2xl relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/5 to-orange-500/5 pointer-events-none" />
           <div className="h-16 w-16 bg-yellow-500/10 text-yellow-500 rounded-2xl flex items-center justify-center text-3xl mb-6 mx-auto">⏳</div>
-          <h2 className="text-2xl font-bold mb-3">Onboarding Pending Approval</h2>
+          <h2 className="text-2xl font-bold mb-3">Application Submitted — Awaiting Admin Approval</h2>
           <p className="text-sm text-muted leading-relaxed mb-6">
-            Thank you for registering <strong>{organization.name}</strong>! Your travel agency account is currently under review by our platform administrators.
+            Thank you for registering <strong>{organization?.name || 'your agency'}</strong>! Your travel agency application is currently under review by our platform administrators.
           </p>
           <div className="p-4 rounded-xl bg-surface-hover border border-border/50 text-xs text-muted text-left mb-6">
-            <p className="font-semibold mb-1">Status Checklist:</p>
+            <p className="font-semibold mb-1">Application Status Checklist:</p>
             <ul className="list-disc pl-4 space-y-1">
               <li>Account Registration: Completed</li>
-              <li>Organization Provisioning: Completed</li>
-              <li>Platform Admin Review: In Progress</li>
+              <li>Agency Profile Created: Completed</li>
+              <li>Platform Admin Review: <span className="font-bold text-yellow-600">Pending Approval</span></li>
             </ul>
+            <p className="mt-3 text-[11px] text-muted">
+              Once approved, you will gain full access to publish tour packages, manage bookings, and list rentals.
+            </p>
           </div>
           <button onClick={() => logout()} className="px-6 py-2.5 rounded-xl border border-border hover:bg-surface-hover font-semibold text-sm transition-all tap-target flex items-center justify-center gap-2 mx-auto">
             <FiLogOut /> Logout

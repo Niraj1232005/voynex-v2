@@ -21,6 +21,9 @@ export class Organization {
   @Column({ default: false })
   isApproved: boolean;
 
+  @Column({ default: 'pending' })
+  status: string;
+
   @OneToMany(() => User, (user) => user.organization)
   users: User[];
 

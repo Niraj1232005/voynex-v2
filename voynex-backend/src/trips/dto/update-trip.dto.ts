@@ -1,4 +1,14 @@
-import { IsOptional, IsString, IsNumber, IsArray, IsBoolean } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  IsNumber,
+  IsArray,
+  IsBoolean,
+  IsObject,
+  ValidateNested,
+} from 'class-validator';
+import { Type } from 'class-transformer';
+import { ItineraryDayDto } from './create-trip.dto';
 
 export class UpdateTripDto {
   @IsOptional()
@@ -12,6 +22,14 @@ export class UpdateTripDto {
   @IsOptional()
   @IsString()
   destination?: string;
+
+  @IsOptional()
+  @IsObject()
+  coordinates?: { lat: number; lng: number };
+
+  @IsOptional()
+  @IsObject()
+  meetingPoint?: { name: string; address?: string; coordinates?: { lat: number; lng: number } };
 
   @IsOptional()
   @IsNumber()
@@ -47,7 +65,9 @@ export class UpdateTripDto {
 
   @IsOptional()
   @IsArray()
-  itinerary?: any[];
+  @ValidateNested({ each: true })
+  @Type(() => ItineraryDayDto)
+  itinerary?: ItineraryDayDto[];
 
   @IsOptional()
   @IsArray()

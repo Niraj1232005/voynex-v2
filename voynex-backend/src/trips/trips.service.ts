@@ -45,13 +45,30 @@ export class GetTripsQueryDto {
   limit?: number;
 }
 
+import { ForbiddenException } from '@nestjs/common';
+
 @Injectable()
 export class TripsService {
   constructor(
     @InjectRepository(Trip)
     private tripsRepository: Repository<Trip>,
+    @InjectRepository(Organization)
+    private organizationsRepository: Repository<Organization>,
     private dataSource: DataSource,
   ) {}
+
+  private async verifyApprovedOrganization(organizationId: string) {
+    if (!organizationId) {
+      throw new ForbiddenException('User does not belong to an organization');
+    }
+    const org = await this.organizationsRepository.findOne({ where: { id: organizationId } });
+    if (!org) {
+      throw new NotFoundException('Organization not found');
+    }
+    if (!org.isApproved || org.status === 'rejected') {
+      throw new ForbiddenException('Your agency account is awaiting platform admin approval.');
+    }
+  }
 
   normalizeTrip(trip: any): any {
     if (!trip) return null;
@@ -103,6 +120,8 @@ export class TripsService {
     userId: string,
     createTripDto: CreateTripDto,
   ): Promise<any> {
+    await this.verifyApprovedOrganization(organizationId);
+
     const trip = this.tripsRepository.create({
       ...createTripDto,
       currency: createTripDto.currency || 'INR',
@@ -210,9 +229,15 @@ export class TripsService {
     organizationId: string,
     updateTripDto: UpdateTripDto,
   ): Promise<any> {
+    await this.verifyApprovedOrganization(organizationId);
     const trip = await this.findOneByOrganization(id, organizationId);
 
-    Object.assign(trip, updateTripDto);
+    // Safely assign only defined keys so omitted fields (like itinerary on partial edit) are preserved
+    Object.keys(updateTripDto).forEach((key) => {
+      if ((updateTripDto as any)[key] !== undefined) {
+        (trip as any)[key] = (updateTripDto as any)[key];
+      }
+    });
 
     const saved = await this.tripsRepository.save(trip);
     return this.normalizeTrip(saved);
@@ -222,6 +247,7 @@ export class TripsService {
     id: string,
     organizationId: string,
   ): Promise<{ message: string }> {
+    await this.verifyApprovedOrganization(organizationId);
     const trip = await this.findOneByOrganization(id, organizationId);
 
     await this.tripsRepository.remove(trip);

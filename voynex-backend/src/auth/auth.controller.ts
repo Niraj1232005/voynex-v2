@@ -78,6 +78,14 @@ export class AuthController {
         lastName: user.lastName,
         role: user.role,
         organizationId: user.organizationId,
+        organization: user.organization ? {
+          id: user.organization.id,
+          _id: user.organization.id,
+          name: user.organization.name,
+          slug: user.organization.slug,
+          isApproved: user.organization.isApproved,
+          status: user.organization.status || (user.organization.isApproved ? 'approved' : 'pending'),
+        } : null,
       },
     };
   }
@@ -99,6 +107,14 @@ export class AuthController {
             lastName: user.lastName,
             role: user.role,
             organizationId: user.organizationId,
+            organization: user.organization ? {
+              id: user.organization.id,
+              _id: user.organization.id,
+              name: user.organization.name,
+              slug: user.organization.slug,
+              isApproved: user.organization.isApproved,
+              status: user.organization.status || (user.organization.isApproved ? 'approved' : 'pending'),
+            } : null,
           }
         : req.user,
     };

@@ -1,8 +1,8 @@
 'use client';
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, Suspense, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { TbCheck, TbCreditCard, TbLock, TbBuildingBank, TbChevronLeft, TbAlertCircle } from 'react-icons/tb';
+import { TbCheck, TbCreditCard, TbLock, TbBuildingBank, TbChevronLeft, TbAlertCircle, TbPackage } from 'react-icons/tb';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
 
@@ -32,8 +32,20 @@ function CheckoutPageInner() {
   const adults = parseInt(searchParams.get('adults') || '2');
   const children = parseInt(searchParams.get('children') || '0');
   const seniors = parseInt(searchParams.get('seniors') || '0');
+  const rentalsParam = searchParams.get('rentals');
+
+  const parsedRentals: { rentalId: string; quantity: number }[] = useMemo(() => {
+    if (!rentalsParam) return [];
+    try {
+      const parsed = JSON.parse(rentalsParam);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }, [rentalsParam]);
   
   const [trip, setTrip] = useState<any>(null);
+  const [rentalDetails, setRentalDetails] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [step, setStep] = useState<CheckoutStep>(1);
 
@@ -54,13 +66,26 @@ function CheckoutPageInner() {
     }
     if (tripId) {
       api.get(`/trips/${tripId}`)
-        .then(res => setTrip(res))
+        .then(async (res) => {
+          setTrip(res);
+          const orgId = res.organizationId || res.organization_id || res.organization?.id;
+          if (orgId && parsedRentals.length > 0) {
+            try {
+              const rRes = await api.get(`/rentals?organizationId=${orgId}`);
+              if (Array.isArray(rRes)) {
+                setRentalDetails(rRes);
+              }
+            } catch (rErr) {
+              console.warn('Could not load rental equipment details for checkout:', rErr);
+            }
+          }
+        })
         .catch(err => console.error('Error fetching trip for checkout:', err))
         .finally(() => setLoading(false));
     } else {
       setLoading(false);
     }
-  }, [isAuthenticated, router, tripId]);
+  }, [isAuthenticated, router, tripId, parsedRentals.length]);
 
   useEffect(() => {
     loadRazorpayScript();
@@ -85,9 +110,33 @@ function CheckoutPageInner() {
   );
 
   const totalGuests = adults + children + seniors;
-  const subtotal = trip.price * totalGuests;
-  const taxes = subtotal * 0.18; // 18% GST approx
-  const total = subtotal + taxes;
+  const tripSubtotal = Number(trip.price || 0) * totalGuests;
+  const durationDays = trip.durationDays || trip.duration || 1;
+
+  // Process selected rentals
+  let rentalSubtotal = 0;
+  let depositSubtotal = 0;
+
+  const populatedRentals = parsedRentals.map(item => {
+    const detail = rentalDetails.find(r => (r.id || r._id) === item.rentalId);
+    const pricePerDay = Number(detail?.pricePerDay || 0);
+    const deposit = Number(detail?.deposit || 0);
+    const itemTotal = pricePerDay * durationDays * item.quantity;
+    const itemDeposit = deposit * item.quantity;
+    rentalSubtotal += itemTotal;
+    depositSubtotal += itemDeposit;
+    return {
+      ...item,
+      title: detail?.title || detail?.name || 'Equipment Rental',
+      category: detail?.category || 'Gear',
+      pricePerDay,
+      deposit,
+      itemTotal,
+      itemDeposit,
+    };
+  });
+
+  const total = tripSubtotal + rentalSubtotal + depositSubtotal;
 
   const handleConfirmPayment = async () => {
     setErrorMessage('');
@@ -103,7 +152,7 @@ function CheckoutPageInner() {
     try {
       // Step 1: Create Booking in DB
       const travelDateStr = date ? new Date(date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
-      const bookingPayload = {
+      const bookingPayload: any = {
         tripId,
         travelersCount: totalGuests,
         travelDate: travelDateStr,
@@ -112,6 +161,13 @@ function CheckoutPageInner() {
         seniorsCount: seniors,
         notes: specialRequests,
       };
+
+      if (parsedRentals.length > 0) {
+        bookingPayload.rentals = parsedRentals.map(r => ({
+          rentalId: r.rentalId,
+          quantity: r.quantity,
+        }));
+      }
 
       const bookingRes = await api.post('/bookings', bookingPayload);
       const realBookingId = bookingRes._id || bookingRes.id;
@@ -240,9 +296,32 @@ function CheckoutPageInner() {
                     </div>
                   </div>
 
-                  <div className="p-6 rounded-2xl border border-border bg-surface-hover">
-                    <p className="text-sm font-medium flex items-center gap-2">
-                      <TbCheck className="text-green-500" /> Free cancellation before {date ? new Date(new Date(date).getTime() - 2 * 24 * 60 * 60 * 1000).toLocaleDateString() : 'departure'}
+                  {populatedRentals.length > 0 && (
+                    <div className="p-6 rounded-2xl border border-border bg-card">
+                      <div className="flex items-center gap-2 mb-4">
+                        <TbPackage className="text-accent" size={20} />
+                        <h3 className="font-bold text-lg text-accent">Optional Equipment Rental</h3>
+                      </div>
+                      <div className="space-y-3">
+                        {populatedRentals.map((r, i) => (
+                          <div key={i} className="flex justify-between items-center text-sm border-b border-border/40 pb-2.5 last:border-0 last:pb-0">
+                            <div>
+                              <p className="font-bold text-foreground">{r.title} <span className="text-xs text-muted font-normal">&times; {r.quantity}</span></p>
+                              <p className="text-xs text-muted">₹{r.pricePerDay}/day for {durationDays} days {r.deposit > 0 ? `• ₹${r.deposit} deposit/item` : ''}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-bold">₹{r.itemTotal.toLocaleString()}</p>
+                              {r.itemDeposit > 0 && <p className="text-[10px] text-muted">+ ₹{r.itemDeposit.toLocaleString()} dep.</p>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="p-4 rounded-2xl border border-border bg-surface-hover">
+                    <p className="text-xs font-semibold flex items-center gap-2 text-muted">
+                      <TbCheck className="text-green-500" /> Cancellations and refunds are subject to agency booking terms.
                     </p>
                   </div>
 
@@ -353,18 +432,26 @@ function CheckoutPageInner() {
                 </div>
               </div>
 
-              <div className="space-y-4 text-sm font-medium mb-6">
+              <div className="space-y-3 text-sm font-medium mb-6">
                 <div className="flex justify-between text-muted">
-                  <span>₹{trip.price.toLocaleString()} × {totalGuests} guests</span>
-                  <span>₹{subtotal.toLocaleString()}</span>
+                  <span>Trip ({trip.price.toLocaleString()} &times; {totalGuests})</span>
+                  <span>₹{tripSubtotal.toLocaleString()}</span>
                 </div>
-                <div className="flex justify-between text-muted">
-                  <span>Taxes & Fees (18%)</span>
-                  <span>₹{taxes.toLocaleString()}</span>
-                </div>
+                {rentalSubtotal > 0 && (
+                  <div className="flex justify-between text-muted">
+                    <span>Optional Gear ({populatedRentals.reduce((s, i) => s + i.quantity, 0)} items)</span>
+                    <span>₹{rentalSubtotal.toLocaleString()}</span>
+                  </div>
+                )}
+                {depositSubtotal > 0 && (
+                  <div className="flex justify-between text-muted">
+                    <span>Security Deposit (Refundable)</span>
+                    <span>₹{depositSubtotal.toLocaleString()}</span>
+                  </div>
+                )}
               </div>
 
-              <div className="border-t border-border pt-6 flex justify-between items-center">
+              <div className="border-t border-border pt-4 flex justify-between items-center">
                 <span className="font-bold text-lg">Total</span>
                 <span className="font-bold text-2xl text-accent">₹{total.toLocaleString()}</span>
               </div>

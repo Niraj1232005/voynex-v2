@@ -65,14 +65,30 @@ export default function AgencyBookingsPage() {
                       <p className="text-xs text-muted font-mono">{b.userId || 'N/A'}</p>
                     </td>
                     <td className="p-4">
-                      <p className="font-medium text-foreground">{b.trip?.title || 'Trip Details'}</p>
+                      <p className="font-medium text-foreground">{b.trip?.title || b.rental?.title || 'Trip Booking'}</p>
                       <p className="text-xs text-muted">Date: {b.startDate || b.travelDate}</p>
+                      {b.rentals && Array.isArray(b.rentals) && b.rentals.length > 0 && (
+                        <div className="mt-2 p-2 rounded-lg bg-surface border border-border/60 space-y-1">
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-primary">Attached Rentals ({b.rentals.length}):</p>
+                          {b.rentals.map((r: any, idx: number) => (
+                            <div key={idx} className="text-xs text-muted flex items-center justify-between gap-2">
+                              <span>🎒 {r.title} &times; {r.quantity}</span>
+                              <span className="font-mono text-[10px]">₹{Number(r.totalAmount || (r.pricePerDay * (r.daysCount || 1) * r.quantity) || 0).toLocaleString()}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </td>
                     <td className="p-4">
                       <p className="font-medium text-foreground">{getGuestsString(b)}</p>
                     </td>
-                    <td className="p-4 font-bold text-foreground">
-                      ₹{Number(b.totalPrice || b.totalAmount).toLocaleString()}
+                    <td className="p-4">
+                      <p className="font-bold text-foreground">₹{Number(b.totalPrice || b.totalAmount).toLocaleString()}</p>
+                      {Number(b.rentalAmount || 0) > 0 && (
+                        <p className="text-[10px] text-muted font-normal">
+                          (Trip: ₹{Number(b.tripAmount || 0).toLocaleString()} • Gear: ₹{Number(b.rentalAmount).toLocaleString()}{Number(b.depositAmount || 0) > 0 ? ` • Dep: ₹${Number(b.depositAmount).toLocaleString()}` : ''})
+                        </p>
+                      )}
                     </td>
                     <td className="p-4">
                       <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${

@@ -33,6 +33,14 @@ export class PaymentsService {
       throw new NotFoundException('Booking not found');
     }
 
+    if (booking.paymentStatus === 'paid') {
+      throw new BadRequestException('Booking is already paid');
+    }
+
+    if (booking.status === 'cancelled') {
+      throw new BadRequestException('Cannot create payment order for a cancelled booking');
+    }
+
     const amountInPaise = Math.round(Number(booking.totalPrice) * 100);
 
     const order = await this.razorpay.orders.create({
@@ -73,6 +81,14 @@ export class PaymentsService {
 
     if (!payment) {
       throw new NotFoundException('Payment order not found');
+    }
+
+    if (payment.status === 'paid') {
+      return {
+        success: true,
+        message: 'Payment already verified successfully',
+        payment,
+      };
     }
 
     const payload = `${razorpay_order_id}|${razorpay_payment_id}`;

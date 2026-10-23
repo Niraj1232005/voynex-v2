@@ -26,8 +26,9 @@ export class RentalsController {
     @Query('category') category?: string,
     @Query('location') location?: string,
     @Query('search') search?: string,
+    @Query('organizationId') organizationId?: string,
   ) {
-    return this.rentalsService.findAll({ category, location, search });
+    return this.rentalsService.findAll({ category, location, search, organizationId });
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

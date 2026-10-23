@@ -22,10 +22,16 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const loggedInUser = await login(email, password);
-      if (loggedInUser.role === 'admin') router.push('/admin');
-      else if (loggedInUser.role === 'agency') router.push('/agency');
-      else router.push('/dashboard');
-    } catch { setError('Invalid credentials'); }
+      if (loggedInUser.role === 'admin') {
+        router.push('/admin');
+      } else if (loggedInUser.role === 'agency' || loggedInUser.organization_id) {
+        router.push('/agency');
+      } else {
+        router.push('/dashboard');
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Invalid credentials. Please verify your email and password.');
+    }
     setLoading(false);
   };
 

@@ -138,6 +138,7 @@ export class AdminService {
     const org = await this.organizationsRepository.findOne({ where: { id } });
     if (!org) throw new NotFoundException('Organization not found');
     org.isApproved = isApproved !== undefined ? isApproved : !org.isApproved;
+    org.status = org.isApproved ? 'approved' : 'rejected';
     return this.organizationsRepository.save(org);
   }
 

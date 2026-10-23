@@ -11,6 +11,13 @@ export interface User {
   role: Role;
   avatar?: string;
   organization_id?: string;
+  organization?: {
+    id: string;
+    name: string;
+    slug: string;
+    isApproved: boolean;
+    status: 'pending' | 'approved' | 'rejected' | string;
+  } | null;
   preferences?: UserPreferences;
   createdAt: string;
 }
@@ -25,6 +32,8 @@ export interface Trip {
   _id: string;
   title: string;
   destination: string;
+  coordinates?: { lat: number; lng: number };
+  meetingPoint?: { name: string; address?: string; coordinates?: { lat: number; lng: number } };
   description: string;
   price: number;
   duration: number; // in days
@@ -51,6 +60,17 @@ export interface ItineraryDay {
   activities: string[];
 }
 
+export interface BookingRentalItem {
+  rentalId: string;
+  title: string;
+  category?: string;
+  quantity: number;
+  pricePerDay: number;
+  deposit: number;
+  daysCount: number;
+  totalAmount: number;
+}
+
 export interface Booking {
   _id: string;
   trip: Trip;
@@ -58,7 +78,13 @@ export interface Booking {
   startDate: string;
   guests: number;
   totalPrice: number;
+  tripAmount?: number;
+  rentalAmount?: number;
+  depositAmount?: number;
+  rentals?: BookingRentalItem[];
+  itinerary?: ItineraryDay[];
   status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
+  paymentStatus?: 'pending' | 'paid' | 'refunded';
   paymentId?: string;
   groupComposition?: GroupComposition;
   createdAt: string;

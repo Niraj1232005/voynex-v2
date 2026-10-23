@@ -27,9 +27,15 @@ export default function SignupPage() {
     if (role === 'agency' && !organizationName.trim()) { setError('Please fill in organization name'); return; }
     setLoading(true);
     try {
-      await signup(name, email, password, role, role === 'agency' ? organizationName : undefined);
-      router.push('/dashboard');
-    } catch { setError('Signup failed'); }
+      const createdUser = await signup(name, email, password, role, role === 'agency' ? organizationName : undefined);
+      if (role === 'agency' || createdUser.role === 'agency' || createdUser.organization_id) {
+        router.push('/agency');
+      } else {
+        router.push('/dashboard');
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Signup failed');
+    }
     setLoading(false);
   };
 
@@ -75,12 +81,12 @@ export default function SignupPage() {
             </div>
             <div>
               <label className="block text-sm font-medium mb-1.5">I am a</label>
-              <div className="grid grid-cols-3 gap-2">
-                {(['user', 'agency', 'admin'] as Role[]).map(r => (
+              <div className="grid grid-cols-2 gap-2">
+                {(['user', 'agency'] as Role[]).map(r => (
                   <button key={r} type="button" onClick={() => setRole(r)}
                     className={`py-2.5 rounded-xl border text-sm font-medium capitalize transition-all ${
                       role === r ? 'border-primary bg-primary/10 text-primary' : 'border-border hover:border-primary/50'}`}>
-                    {r === 'agency' ? 'Travel Agency' : r}
+                    {r === 'agency' ? 'Travel Agency' : 'Traveler'}
                   </button>
                 ))}
               </div>

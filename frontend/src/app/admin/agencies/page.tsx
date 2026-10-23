@@ -29,7 +29,7 @@ export default function AdminAgenciesPage() {
 
     api.patch(`/admin/organizations/${id}/approve`, { isApproved })
       .then(() => {
-        setAgencies(prev => prev.map(a => (a._id === id || a.id === id) ? { ...a, isApproved } : a));
+        setAgencies(prev => prev.map(a => (a._id === id || a.id === id) ? { ...a, isApproved, status: isApproved ? 'approved' : 'rejected' } : a));
       })
       .catch(err => alert(err.message || `Failed to ${actionText} agency`));
   };
@@ -80,9 +80,11 @@ export default function AdminAgenciesPage() {
                       </div>
                     </div>
                     <span className={`px-2.5 py-1 rounded-full text-[10px] uppercase font-bold ${
-                      a.isApproved ? 'bg-emerald-500/10 text-emerald-500' : 'bg-yellow-500/10 text-yellow-600'
+                      (a.status === 'approved' || a.isApproved) ? 'bg-emerald-500/10 text-emerald-500' :
+                      a.status === 'rejected' ? 'bg-red-500/10 text-red-500' :
+                      'bg-yellow-500/10 text-yellow-600'
                     }`}>
-                      {a.isApproved ? 'Approved' : 'Pending'}
+                      {a.status === 'rejected' ? 'Rejected' : a.isApproved ? 'Approved' : 'Pending'}
                     </span>
                   </div>
                   <div className="grid grid-cols-2 gap-4 mb-4">
@@ -106,7 +108,7 @@ export default function AdminAgenciesPage() {
                   </button>
                   <button 
                     onClick={() => handleToggleApproval(id, false)} 
-                    disabled={!a.isApproved}
+                    disabled={a.status === 'rejected'}
                     className="flex-1 py-2 rounded-lg bg-red-500/10 text-red-500 text-xs font-bold hover:bg-red-500/20 transition-all disabled:opacity-40"
                   >
                     Reject

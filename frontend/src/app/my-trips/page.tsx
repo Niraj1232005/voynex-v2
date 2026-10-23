@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { TbTicket, TbHeart, TbMapPin, TbCalendar, TbUsers, TbSettings, TbArrowRight } from 'react-icons/tb';
+import { TbTicket, TbHeart, TbMapPin, TbCalendar, TbUsers, TbSettings, TbArrowRight, TbTrash } from 'react-icons/tb';
 import { Trip } from '@/types';
 import Breadcrumbs from '@/components/Breadcrumbs';
 import { api } from '@/lib/api';
@@ -38,23 +38,62 @@ export default function MyTripsPage() {
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [resumingId, setResumingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [isClearingAll, setIsClearingAll] = useState(false);
   const { showToast } = useToast();
 
-  const fetchBookings = () => {
-    Promise.all([
-      api.get('/bookings').catch(() => []),
-      api.get('/wishlist').catch(() => []),
-    ])
-      .then(([bookingsRes, wishlistRes]) => {
-        if (Array.isArray(bookingsRes)) setBookings(bookingsRes);
-        if (Array.isArray(wishlistRes)) {
-          setSavedTrips(wishlistRes.map((w: any) => ({
-            ...w.item,
-            _id: w.item?._id || w.item?.id || w._id,
-          })).filter((item: any) => item.title));
+  const fetchBookings = async () => {
+    try {
+      const [bookingsRes, wishlistRes] = await Promise.all([
+        api.get('/bookings').catch(() => []),
+        api.get('/wishlist').catch(() => []),
+      ]);
+
+      if (Array.isArray(bookingsRes)) setBookings(bookingsRes);
+
+      let wishes = Array.isArray(wishlistRes) ? wishlistRes : [];
+
+      const localSaved = localStorage.getItem('voynex_saved_trips');
+      let localIds: string[] = [];
+      try {
+        if (localSaved) localIds = JSON.parse(localSaved);
+      } catch {}
+
+      if (wishes.length === 0 && localIds.length > 0) {
+        await Promise.allSettled(
+          localIds.map((id) => api.post('/wishlist', { itemType: 'trip', itemId: id }))
+        );
+        const reWish = await api.get('/wishlist').catch(() => []);
+        if (Array.isArray(reWish) && reWish.length > 0) {
+          wishes = reWish;
         }
-      })
-      .finally(() => setLoading(false));
+      }
+
+      if (wishes.length > 0) {
+        setSavedTrips(
+          wishes
+            .map((w: any) => ({
+              ...w.item,
+              _id: w.item?._id || w.item?.id || w._id,
+            }))
+            .filter((item: any) => item && (item.title || item.name))
+        );
+      } else if (localIds.length > 0) {
+        const allTripsRes = await api.get('/trips').catch(() => []);
+        const allTrips = Array.isArray(allTripsRes) ? allTripsRes : (allTripsRes?.data || []);
+        const matching = allTrips
+          .filter((t: any) => localIds.includes(t.id || t._id))
+          .map((t: any) => ({
+            ...t,
+            _id: t.id || t._id,
+          }));
+        setSavedTrips(matching);
+      } else {
+        setSavedTrips([]);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -141,6 +180,49 @@ export default function MyTripsPage() {
     }
   };
 
+  const handleDeleteBooking = async (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!window.confirm('Are you sure you want to delete this booking?')) {
+      return;
+    }
+    setDeletingId(id);
+    try {
+      await api.delete(`/bookings/${id}`);
+      showToast('Booking deleted successfully', 'success');
+      fetchBookings();
+    } catch (err: any) {
+      showToast(err.message || 'Failed to delete booking', 'error');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleClearAllUnpaid = async () => {
+    if (awaitingPayment.length === 0) return;
+    if (!window.confirm(`Are you sure you want to remove all ${awaitingPayment.length} unpaid bookings?`)) {
+      return;
+    }
+    setIsClearingAll(true);
+    try {
+      const results = await Promise.allSettled(
+        awaitingPayment.map((b) => api.delete(`/bookings/${b._id || b.id}`))
+      );
+      const fulfilled = results.filter((r) => r.status === 'fulfilled').length;
+      if (fulfilled > 0) {
+        showToast(`Cleared ${fulfilled} unpaid booking${fulfilled > 1 ? 's' : ''}`, 'success');
+      }
+      const failed = results.filter((r) => r.status === 'rejected').length;
+      if (failed > 0) {
+        showToast(`Could not delete ${failed} booking(s)`, 'error');
+      }
+      fetchBookings();
+    } catch (err: any) {
+      showToast(err.message || 'Error clearing bookings', 'error');
+    } finally {
+      setIsClearingAll(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -181,20 +263,41 @@ export default function MyTripsPage() {
             {/* Awaiting Payment Section */}
             {awaitingPayment.length > 0 && (
               <div>
-                <h2 className="text-xl font-bold mb-4 text-amber-500 flex items-center gap-2">
-                  ⚠️ Awaiting Payment ({awaitingPayment.length})
-                </h2>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                  <h2 className="text-xl font-bold text-amber-500 flex items-center gap-2">
+                    ⚠️ Awaiting Payment ({awaitingPayment.length})
+                  </h2>
+                  <button
+                    onClick={handleClearAllUnpaid}
+                    disabled={isClearingAll}
+                    className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white text-xs font-bold transition-all w-fit disabled:opacity-50"
+                  >
+                    <TbTrash size={15} />
+                    {isClearingAll ? 'Clearing all...' : `Clear All Unpaid (${awaitingPayment.length})`}
+                  </button>
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {awaitingPayment.map(b => {
                     const item = b.trip || b.rental || {};
                     const bId = b._id || b.id;
+                    const isDeleting = deletingId === bId;
                     return (
                       <div key={bId} className="p-5 rounded-2xl border border-amber-500/30 bg-amber-500/5 hover:shadow-lg transition-all">
                         <div className="flex justify-between items-start mb-3">
                           <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-500 text-[10px] font-bold uppercase">
                             Payment Pending
                           </span>
-                          <span className="text-xs text-muted font-mono">{bId}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted font-mono">{bId}</span>
+                            <button
+                              onClick={(e) => handleDeleteBooking(bId, e)}
+                              disabled={isDeleting}
+                              title="Delete this unpaid booking"
+                              className="p-1 rounded-lg text-muted hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                            >
+                              <TbTrash size={16} />
+                            </button>
+                          </div>
                         </div>
                         <h3 className="font-bold text-lg text-foreground mb-1">{item.title || item.name || 'Unpaid Booking'}</h3>
                         <p className="text-xs text-muted flex items-center gap-1 mb-3">
@@ -204,15 +307,36 @@ export default function MyTripsPage() {
                           <span className="flex items-center gap-1"><TbCalendar size={14} /> {b.travelDate || 'Date pending'}</span>
                           <span className="flex items-center gap-1"><TbUsers size={14} /> {getGuestsString(b)}</span>
                         </div>
+                        {b.rentals && Array.isArray(b.rentals) && b.rentals.length > 0 && (
+                          <div className="mt-3 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs space-y-1">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700">Optional Rentals ({b.rentals.length}):</span>
+                            {b.rentals.map((r: any, idx: number) => (
+                              <div key={idx} className="flex justify-between text-muted text-[11px]">
+                                <span>🎒 {r.title} &times; {r.quantity}</span>
+                                <span className="font-mono">₹{Number(r.totalAmount || (r.pricePerDay * (r.daysCount || 1) * r.quantity) || 0).toLocaleString()}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                         <div className="flex items-center justify-between mt-4 pt-3 border-t border-border/60">
                           <span className="text-xl font-black text-amber-500">₹{Number(b.totalAmount || b.totalPrice || 0).toLocaleString()}</span>
-                          <button
-                            onClick={() => handleResumePayment(b)}
-                            disabled={resumingId === bId}
-                            className="px-5 py-2 rounded-xl bg-amber-500 text-black font-bold text-xs hover:bg-amber-400 transition-all disabled:opacity-50"
-                          >
-                            {resumingId === bId ? 'Processing...' : 'Resume Payment'}
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={(e) => handleDeleteBooking(bId, e)}
+                              disabled={isDeleting}
+                              className="px-3 py-2 rounded-xl border border-red-500/30 bg-red-500/5 text-red-500 hover:bg-red-500/15 font-bold text-xs transition-all flex items-center gap-1 disabled:opacity-50"
+                            >
+                              <TbTrash size={14} />
+                              {isDeleting ? 'Deleting...' : 'Delete'}
+                            </button>
+                            <button
+                              onClick={() => handleResumePayment(b)}
+                              disabled={resumingId === bId || isDeleting}
+                              className="px-5 py-2 rounded-xl bg-amber-500 text-black font-bold text-xs hover:bg-amber-400 transition-all disabled:opacity-50"
+                            >
+                              {resumingId === bId ? 'Processing...' : 'Resume Payment'}
+                            </button>
+                          </div>
                         </div>
                       </div>
                     );
@@ -248,6 +372,17 @@ export default function MyTripsPage() {
                           <span className="flex items-center gap-1"><TbCalendar size={14} /> {b.travelDate || 'Date pending'}</span>
                           <span className="flex items-center gap-1"><TbUsers size={14} /> {getGuestsString(b)}</span>
                         </div>
+                        {b.rentals && Array.isArray(b.rentals) && b.rentals.length > 0 && (
+                          <div className="mt-3 p-2.5 rounded-xl bg-surface border border-border/60 text-xs space-y-1">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-primary">Included Rentals ({b.rentals.length}):</span>
+                            {b.rentals.map((r: any, idx: number) => (
+                              <div key={idx} className="flex justify-between text-muted text-[11px]">
+                                <span>🎒 {r.title} &times; {r.quantity}</span>
+                                <span className="font-mono">₹{Number(r.totalAmount || (r.pricePerDay * (r.daysCount || 1) * r.quantity) || 0).toLocaleString()}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                         <div className="flex items-center justify-between mt-4 pt-3 border-t border-border/60">
                           <span className="text-xl font-black text-primary">₹{Number(b.totalAmount || b.totalPrice || 0).toLocaleString()}</span>
                           <Link href={`/booking-success?bookingId=${b._id || b.id}`} className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90">
@@ -279,6 +414,16 @@ export default function MyTripsPage() {
                           }`}>
                             {b.status}
                           </span>
+                          {b.paymentStatus !== 'paid' && (
+                            <button
+                              onClick={(e) => handleDeleteBooking(b._id || b.id, e)}
+                              disabled={deletingId === (b._id || b.id)}
+                              title="Delete cancelled record"
+                              className="p-1 rounded-lg text-muted hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                            >
+                              <TbTrash size={16} />
+                            </button>
+                          )}
                         </div>
                         <h3 className="font-bold text-base text-foreground mb-1">{trip.title || 'Trip Booking'}</h3>
                         <p className="text-xs text-muted mb-2">{trip.destination}</p>
