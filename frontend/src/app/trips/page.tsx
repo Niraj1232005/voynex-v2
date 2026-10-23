@@ -37,11 +37,11 @@ function mapBackendTripToFrontend(bTrip: any): any {
     destination: bTrip.destination,
     description: bTrip.description,
     price: Number(bTrip.price || 0),
-    duration: bTrip.durationDays || bTrip.duration || 1,
-    durationDays: bTrip.durationDays || bTrip.duration || 1,
-    maxGroupSize: bTrip.maxTravelers || 20,
+    duration: Number(bTrip.durationDays || bTrip.duration || 1),
+    durationDays: Number(bTrip.durationDays || bTrip.duration || 1),
+    maxGroupSize: Number(bTrip.maxTravelers || 20),
     difficulty: bTrip.difficulty || 'moderate',
-    rating: bTrip.rating || 4.8,
+    rating: Number(bTrip.rating || 4.8),
     reviewCount: bTrip.reviewCount || 0,
     images,
     activityType: bTrip.activityType || ['adventure'],
@@ -77,6 +77,95 @@ const ACTIVITY_COLORS: Record<string, string> = {
   wellness: 'bg-purple-500/10 text-purple-500',
 };
 
+interface FilterDropdownProps {
+  title: string;
+  options: string[];
+  isOpen: boolean;
+  onToggle: () => void;
+  selectedValues: string[];
+  onToggleOption: (value: string) => void;
+  onClear: () => void;
+}
+
+function FilterDropdown({
+  title,
+  options,
+  isOpen,
+  onToggle,
+  selectedValues,
+  onToggleOption,
+  onClear,
+}: FilterDropdownProps) {
+  const selectedCount = selectedValues.length;
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={onToggle}
+        className={`flex items-center gap-1.5 px-4 py-2 rounded-full border text-sm font-semibold transition-all tap-target whitespace-nowrap ${
+          selectedCount > 0
+            ? 'border-accent text-accent bg-accent/10 shadow-sm'
+            : isOpen
+            ? 'border-foreground/40 bg-surface-hover text-foreground'
+            : 'border-border bg-card hover:bg-surface-hover text-foreground/90'
+        }`}
+      >
+        <span>{title}</span>
+        {selectedCount > 0 && (
+          <span className="h-5 w-5 rounded-full bg-accent text-white text-xs flex items-center justify-center font-bold">
+            {selectedCount}
+          </span>
+        )}
+        <TbChevronDown
+          size={15}
+          className={`transition-transform duration-200 ${isOpen ? 'rotate-180 text-accent' : ''}`}
+        />
+      </button>
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 6 }}
+            className="absolute top-full left-0 mt-2 w-52 p-2 rounded-2xl border border-border bg-card shadow-2xl z-50 flex flex-col gap-1"
+          >
+            {options.map((opt) => {
+              const isSelected = selectedValues.includes(opt);
+              return (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => onToggleOption(opt)}
+                  className={`flex items-center justify-between px-3.5 py-2 rounded-xl text-sm font-medium transition-all text-left ${
+                    isSelected
+                      ? 'bg-accent/10 text-accent font-bold'
+                      : 'hover:bg-surface-hover text-foreground'
+                  }`}
+                >
+                  <span>{opt}</span>
+                  {isSelected && <TbCheck size={16} className="text-accent" />}
+                </button>
+              );
+            })}
+
+            {selectedCount > 0 && (
+              <button
+                type="button"
+                onClick={onClear}
+                className="mt-1 pt-1.5 border-t border-border text-center text-xs font-bold text-muted hover:text-accent transition-colors py-1"
+              >
+                Reset {title}
+              </button>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 function TripsContent() {
   const { showToast } = useToast();
   const searchParams = useSearchParams();
@@ -91,6 +180,20 @@ function TripsContent() {
   const [viewMode, setViewMode] = useState<'grid' | 'map'>('grid');
   const [trips, setTrips] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const filterBarRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (filterBarRef.current && !filterBarRef.current.contains(event.target as Node)) {
+        setActiveDropdown(null);
+        setShowSort(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   // Sync initial query params from URL (e.g. ?q=Goa or ?category=Beach)
   useEffect(() => {
@@ -203,21 +306,29 @@ function TripsContent() {
       const query = search.trim().toLowerCase();
       const matchSearch =
         !query ||
-        trip.title.toLowerCase().includes(query) ||
-        trip.destination.toLowerCase().includes(query) ||
-        (trip.highlights && trip.highlights.some((h: string) => h.toLowerCase().includes(query)));
+        (trip.title && trip.title.toLowerCase().includes(query)) ||
+        (trip.destination && trip.destination.toLowerCase().includes(query)) ||
+        (trip.description && trip.description.toLowerCase().includes(query)) ||
+        (Array.isArray(trip.highlights) &&
+          trip.highlights.some((h: string) => String(h).toLowerCase().includes(query))) ||
+        (Array.isArray(trip.activityType) &&
+          trip.activityType.some((a: string) => String(a).toLowerCase().includes(query)));
 
       const typeFilters = activeFilters
         .filter((f) => f.type === 'Type')
         .map((f) => f.value.toLowerCase().replace(/[-_\s]+/g, ''));
-      const budgetFilters = activeFilters.filter((f) => f.type === 'Budget').map((f) => f.value);
-      const durationFilters = activeFilters.filter((f) => f.type === 'Duration').map((f) => f.value);
+      const budgetFilters = activeFilters
+        .filter((f) => f.type === 'Budget')
+        .map((f) => f.value);
+      const durationFilters = activeFilters
+        .filter((f) => f.type === 'Duration')
+        .map((f) => f.value);
       const difficultyFilters = activeFilters
         .filter((f) => f.type === 'Difficulty')
         .map((f) => f.value.toLowerCase());
 
-      const tripActivities = (trip.activityType || []).map((a: string) =>
-        a.toLowerCase().replace(/[-_\s]+/g, '')
+      const tripActivities = (Array.isArray(trip.activityType) ? trip.activityType : []).map(
+        (a: string) => String(a).toLowerCase().replace(/[-_\s]+/g, '')
       );
 
       const matchType =
@@ -226,25 +337,35 @@ function TripsContent() {
           tripActivities.some((a: string) => a.includes(t) || t.includes(a))
         );
 
+      const tripDiff = String(trip.difficulty || '').toLowerCase().trim();
       const matchDifficulty =
-        difficultyFilters.length === 0 ||
-        difficultyFilters.includes((trip.difficulty || '').toLowerCase());
+        difficultyFilters.length === 0 || difficultyFilters.includes(tripDiff);
 
+      const tripPrice = Number(trip.price) || 0;
       const matchBudget =
         budgetFilters.length === 0 ||
         budgetFilters.some((b) => {
-          if (b === 'Under ₹15k') return trip.price < 15000;
-          if (b === '₹15k–₹25k') return trip.price >= 15000 && trip.price <= 25000;
-          if (b === '₹25k+') return trip.price > 25000;
+          const cleanB = b.replace(/–/g, '-');
+          if (cleanB.includes('Under') || (cleanB.includes('15k') && !cleanB.includes('25k'))) {
+            return tripPrice < 15000;
+          }
+          if (cleanB.includes('15k') && cleanB.includes('25k')) {
+            return tripPrice >= 15000 && tripPrice <= 25000;
+          }
+          if (cleanB.includes('25k+')) {
+            return tripPrice > 25000;
+          }
           return true;
         });
 
+      const tripDuration = Number(trip.durationDays || trip.duration) || 1;
       const matchDuration =
         durationFilters.length === 0 ||
         durationFilters.some((d) => {
-          if (d === '1–3 days') return trip.duration >= 1 && trip.duration <= 3;
-          if (d === '4–7 days') return trip.duration >= 4 && trip.duration <= 7;
-          if (d === '8+ days') return trip.duration >= 8;
+          const cleanD = d.replace(/–/g, '-');
+          if (cleanD.includes('1') && cleanD.includes('3')) return tripDuration >= 1 && tripDuration <= 3;
+          if (cleanD.includes('4') && cleanD.includes('7')) return tripDuration >= 4 && tripDuration <= 7;
+          if (cleanD.includes('8')) return tripDuration >= 8;
           return true;
         });
 
@@ -253,16 +374,20 @@ function TripsContent() {
 
     switch (sortBy) {
       case 'price-low':
-        result.sort((a, b) => a.price - b.price);
+        result.sort((a, b) => (Number(a.price) || 0) - (Number(b.price) || 0));
         break;
       case 'price-high':
-        result.sort((a, b) => b.price - a.price);
+        result.sort((a, b) => (Number(b.price) || 0) - (Number(a.price) || 0));
         break;
       case 'rating':
-        result.sort((a, b) => b.rating - a.rating);
+        result.sort((a, b) => (Number(b.rating) || 0) - (Number(a.rating) || 0));
         break;
       case 'duration-short':
-        result.sort((a, b) => a.duration - b.duration);
+        result.sort(
+          (a, b) =>
+            (Number(a.durationDays || a.duration) || 0) -
+            (Number(b.durationDays || b.duration) || 0)
+        );
         break;
       case 'newest':
         result.sort((a, b) => (b._id || '').localeCompare(a._id || ''));
@@ -281,86 +406,6 @@ function TripsContent() {
   };
 
   const hasActiveFilters = activeFilters.length > 0 || search.trim().length > 0;
-
-  const FilterDropdown = ({ title, options }: { title: string; options: string[] }) => {
-    const isActive = activeDropdown === title;
-    const selectedCount = activeFilters.filter((f) => f.type === title).length;
-
-    return (
-      <div className="relative flex-shrink-0">
-        <button
-          type="button"
-          onClick={() => setActiveDropdown(isActive ? null : title)}
-          className={`flex items-center gap-1.5 px-4 py-2 rounded-full border text-sm font-semibold transition-all tap-target ${
-            selectedCount > 0
-              ? 'border-accent text-accent bg-accent/10 shadow-sm'
-              : isActive
-              ? 'border-foreground/40 bg-surface-hover text-foreground'
-              : 'border-border bg-card hover:bg-surface-hover text-foreground/90'
-          }`}
-        >
-          <span>{title}</span>
-          {selectedCount > 0 && (
-            <span className="h-5 w-5 rounded-full bg-accent text-white text-xs flex items-center justify-center font-bold">
-              {selectedCount}
-            </span>
-          )}
-          <TbChevronDown
-            size={15}
-            className={`transition-transform duration-200 ${isActive ? 'rotate-180' : ''}`}
-          />
-        </button>
-
-        <AnimatePresence>
-          {isActive && (
-            <>
-              <div className="fixed inset-0 z-20" onClick={() => setActiveDropdown(null)} />
-              <motion.div
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 6 }}
-                className="absolute top-full left-0 mt-2 w-52 p-2 rounded-2xl border border-border bg-card shadow-2xl z-30 flex flex-col gap-1"
-              >
-                {options.map((opt) => {
-                  const isSelected = activeFilters.some(
-                    (f) => f.type === title && f.value === opt
-                  );
-                  return (
-                    <button
-                      key={opt}
-                      type="button"
-                      onClick={() => toggleFilter(title, opt)}
-                      className={`flex items-center justify-between px-3.5 py-2 rounded-xl text-sm font-medium transition-all text-left ${
-                        isSelected
-                          ? 'bg-accent/10 text-accent font-bold'
-                          : 'hover:bg-surface-hover text-foreground'
-                      }`}
-                    >
-                      <span>{opt}</span>
-                      {isSelected && <TbCheck size={16} className="text-accent" />}
-                    </button>
-                  );
-                })}
-
-                {selectedCount > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      clearFilterType(title);
-                      setActiveDropdown(null);
-                    }}
-                    className="mt-1 pt-1.5 border-t border-border text-center text-xs font-bold text-muted hover:text-accent transition-colors py-1"
-                  >
-                    Reset {title}
-                  </button>
-                )}
-              </motion.div>
-            </>
-          )}
-        </AnimatePresence>
-      </div>
-    );
-  };
 
   return (
     <div className="min-h-screen pb-24">
@@ -407,7 +452,7 @@ function TripsContent() {
 
         {/* Sticky Filter & Search Bar */}
         <div className="sticky top-16 z-30 bg-background/90 backdrop-blur-xl border-b border-border py-4 mb-8 -mx-4 px-4 sm:mx-0 sm:px-0">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div ref={filterBarRef} className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
             {/* Search Input */}
             <div className="relative flex-1 min-w-[220px] max-w-md">
               <TbSearch
@@ -418,7 +463,7 @@ function TripsContent() {
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search destination, trip name..."
+                placeholder="Search destination, trip name, activity..."
                 className="w-full pl-10 pr-9 py-2 rounded-full border border-border bg-card text-sm font-medium focus:outline-none focus:border-accent text-foreground transition-all"
               />
               {search && (
@@ -432,22 +477,81 @@ function TripsContent() {
               )}
             </div>
 
-            {/* Filter Dropdowns Scrollable Row & Sort */}
-            <div className="flex items-center justify-between sm:justify-end gap-2.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none flex-1">
-              <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Filter Dropdowns Row & Sort */}
+            <div className="flex items-center flex-wrap gap-2.5">
+              <div className="flex items-center flex-wrap gap-2">
                 <TbFilter size={18} className="text-muted hidden md:block" />
-                <FilterDropdown title="Type" options={CATEGORIES} />
-                <FilterDropdown title="Budget" options={BUDGETS} />
-                <FilterDropdown title="Duration" options={DURATIONS} />
-                <FilterDropdown title="Difficulty" options={DIFFICULTIES} />
+                <FilterDropdown
+                  title="Type"
+                  options={CATEGORIES}
+                  isOpen={activeDropdown === 'Type'}
+                  onToggle={() => {
+                    setShowSort(false);
+                    setActiveDropdown(activeDropdown === 'Type' ? null : 'Type');
+                  }}
+                  selectedValues={activeFilters.filter((f) => f.type === 'Type').map((f) => f.value)}
+                  onToggleOption={(opt) => toggleFilter('Type', opt)}
+                  onClear={() => {
+                    clearFilterType('Type');
+                    setActiveDropdown(null);
+                  }}
+                />
+                <FilterDropdown
+                  title="Budget"
+                  options={BUDGETS}
+                  isOpen={activeDropdown === 'Budget'}
+                  onToggle={() => {
+                    setShowSort(false);
+                    setActiveDropdown(activeDropdown === 'Budget' ? null : 'Budget');
+                  }}
+                  selectedValues={activeFilters.filter((f) => f.type === 'Budget').map((f) => f.value)}
+                  onToggleOption={(opt) => toggleFilter('Budget', opt)}
+                  onClear={() => {
+                    clearFilterType('Budget');
+                    setActiveDropdown(null);
+                  }}
+                />
+                <FilterDropdown
+                  title="Duration"
+                  options={DURATIONS}
+                  isOpen={activeDropdown === 'Duration'}
+                  onToggle={() => {
+                    setShowSort(false);
+                    setActiveDropdown(activeDropdown === 'Duration' ? null : 'Duration');
+                  }}
+                  selectedValues={activeFilters.filter((f) => f.type === 'Duration').map((f) => f.value)}
+                  onToggleOption={(opt) => toggleFilter('Duration', opt)}
+                  onClear={() => {
+                    clearFilterType('Duration');
+                    setActiveDropdown(null);
+                  }}
+                />
+                <FilterDropdown
+                  title="Difficulty"
+                  options={DIFFICULTIES}
+                  isOpen={activeDropdown === 'Difficulty'}
+                  onToggle={() => {
+                    setShowSort(false);
+                    setActiveDropdown(activeDropdown === 'Difficulty' ? null : 'Difficulty');
+                  }}
+                  selectedValues={activeFilters.filter((f) => f.type === 'Difficulty').map((f) => f.value)}
+                  onToggleOption={(opt) => toggleFilter('Difficulty', opt)}
+                  onClear={() => {
+                    clearFilterType('Difficulty');
+                    setActiveDropdown(null);
+                  }}
+                />
               </div>
 
               {/* Sort Dropdown */}
               <div className="relative flex-shrink-0">
                 <button
                   type="button"
-                  onClick={() => setShowSort(!showSort)}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-full border border-border bg-card text-sm font-semibold hover:bg-surface-hover transition-all tap-target text-foreground"
+                  onClick={() => {
+                    setActiveDropdown(null);
+                    setShowSort(!showSort);
+                  }}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-full border border-border bg-card text-sm font-semibold hover:bg-surface-hover transition-all tap-target text-foreground whitespace-nowrap"
                 >
                   <span>Sort: {SORT_OPTIONS.find((o) => o.value === sortBy)?.label}</span>
                   <TbChevronDown
@@ -457,34 +561,31 @@ function TripsContent() {
                 </button>
                 <AnimatePresence>
                   {showSort && (
-                    <>
-                      <div className="fixed inset-0 z-20" onClick={() => setShowSort(false)} />
-                      <motion.div
-                        initial={{ opacity: 0, y: 6 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 6 }}
-                        className="absolute right-0 top-full mt-2 w-48 p-2 rounded-2xl border border-border bg-card shadow-2xl z-30 flex flex-col gap-1"
-                      >
-                        {SORT_OPTIONS.map((opt) => (
-                          <button
-                            key={opt.value}
-                            type="button"
-                            onClick={() => {
-                              setSortBy(opt.value);
-                              setShowSort(false);
-                            }}
-                            className={`flex items-center justify-between px-3.5 py-2 rounded-xl text-sm font-medium transition-all text-left ${
-                              sortBy === opt.value
-                                ? 'bg-accent/10 text-accent font-bold'
-                                : 'hover:bg-surface-hover text-foreground'
-                            }`}
-                          >
-                            <span>{opt.label}</span>
-                            {sortBy === opt.value && <TbCheck size={16} className="text-accent" />}
-                          </button>
-                        ))}
-                      </motion.div>
-                    </>
+                    <motion.div
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 6 }}
+                      className="absolute right-0 top-full mt-2 w-48 p-2 rounded-2xl border border-border bg-card shadow-2xl z-50 flex flex-col gap-1"
+                    >
+                      {SORT_OPTIONS.map((opt) => (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => {
+                            setSortBy(opt.value);
+                            setShowSort(false);
+                          }}
+                          className={`flex items-center justify-between px-3.5 py-2 rounded-xl text-sm font-medium transition-all text-left ${
+                            sortBy === opt.value
+                              ? 'bg-accent/10 text-accent font-bold'
+                              : 'hover:bg-surface-hover text-foreground'
+                          }`}
+                        >
+                          <span>{opt.label}</span>
+                          {sortBy === opt.value && <TbCheck size={16} className="text-accent" />}
+                        </button>
+                      ))}
+                    </motion.div>
                   )}
                 </AnimatePresence>
               </div>
