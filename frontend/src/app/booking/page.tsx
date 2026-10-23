@@ -16,14 +16,11 @@ function BookingContent() {
 
   React.useEffect(() => {
     if (tripId) {
-      api.get(`/trips/${tripId}`)
-        .then(res => setTrip(res))
-        .catch(err => console.error('Error fetching trip for booking page:', err))
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
+      router.replace(`/checkout?${searchParams.toString()}`);
+      return;
     }
-  }, [tripId]);
+    setLoading(false);
+  }, [tripId, searchParams, router]);
 
   const date = searchParams.get('date') || '';
   const adults = parseInt(searchParams.get('adults') || '2');

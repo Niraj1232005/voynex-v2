@@ -77,8 +77,44 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-8 p-4 rounded-xl bg-accent/5 border border-accent/10 text-xs text-muted leading-relaxed">
-            <strong className="text-accent">Demo Account:</strong> Use any email. Include &quot;admin&quot; for admin role, &quot;agency&quot; for agency role. Any password works.
+          {/* Quick Demo Credentials Switcher */}
+          <div className="mt-8 p-4 rounded-2xl bg-surface border border-border text-xs space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-foreground">Demo Accounts (1-Click Fill):</span>
+              <span className="text-[10px] text-muted font-medium">Default: Password123</span>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail('traveler@voynex.com');
+                  setPassword('Password123');
+                }}
+                className="px-2 py-2 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 text-[11px] font-bold transition-all text-center"
+              >
+                🎒 Traveler
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail('agency@himalayan.com');
+                  setPassword('Password123');
+                }}
+                className="px-2 py-2 rounded-xl bg-teal/10 hover:bg-teal/20 text-teal border border-teal/20 text-[11px] font-bold transition-all text-center"
+              >
+                🏢 Agency
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail('admin@voynex.com');
+                  setPassword('Password123');
+                }}
+                className="px-2 py-2 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 border border-purple-500/20 text-[11px] font-bold transition-all text-center"
+              >
+                🛡️ Admin
+              </button>
+            </div>
           </div>
 
           <p className="text-center text-sm text-muted mt-8">

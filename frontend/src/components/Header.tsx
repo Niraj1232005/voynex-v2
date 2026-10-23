@@ -8,7 +8,7 @@ import {
   TbSun, TbMoon, TbMenu2, TbX, TbShoppingCart, TbUser, TbLogout, TbChevronDown, TbChevronRight,
   TbCompass, TbMap, TbMapPin, TbCar, TbCpu, TbPackage, TbMessageCircle,
   TbShoppingBag, TbHeart, TbCalendar, TbSettings, TbUserPlus, TbGridDots, TbHome, TbCrown, TbReceipt, TbSearch,
-  TbClock
+  TbClock, TbShield, TbBriefcase
 } from 'react-icons/tb';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -81,6 +81,11 @@ export default function Header() {
         children: [
           ...(isAuthenticated
             ? [
+                ...(user?.role === 'admin'
+                  ? [{ href: '/admin', label: 'Admin Portal', description: 'Super Admin platform control', icon: TbShield }]
+                  : user?.role === 'agency'
+                  ? [{ href: '/agency', label: 'Agency Portal', description: 'Manage agency trips & bookings', icon: TbBriefcase }]
+                  : []),
                 { href: '/profile', label: 'Profile', description: 'Manage your personal details', icon: TbUser },
                 { href: '/membership', label: 'Membership', description: 'View and upgrade your plan', icon: TbCrown },
                 { href: '#', label: 'Logout', description: 'Sign out of your account', icon: TbLogout, onClick: logout },
@@ -92,7 +97,7 @@ export default function Header() {
         ],
       },
     ];
-  }, [isAuthenticated, logout]);
+  }, [isAuthenticated, user, logout]);
 
   // Close menus on outside click
   useEffect(() => {
@@ -220,6 +225,24 @@ export default function Header() {
 
           {/* Right side */}
           <div className="flex items-center gap-1.5 flex-shrink-0">
+            {/* Role Portal Shortcut Badges */}
+            {user?.role === 'admin' && (
+              <Link
+                href="/admin"
+                className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 text-xs font-bold hover:bg-purple-500/20 transition-all mr-1"
+              >
+                <TbShield size={14} /> Admin Portal
+              </Link>
+            )}
+            {user?.role === 'agency' && (
+              <Link
+                href="/agency"
+                className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal/10 text-teal border border-teal/20 text-xs font-bold hover:bg-teal/20 transition-all mr-1"
+              >
+                <TbBriefcase size={14} /> Agency Portal
+              </Link>
+            )}
+
             {/* Search Icon */}
             <button
               aria-label="Search"
