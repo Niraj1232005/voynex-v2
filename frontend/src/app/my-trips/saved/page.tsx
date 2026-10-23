@@ -6,35 +6,102 @@ import { FiHeart, FiMapPin, FiStar, FiTrash2 } from 'react-icons/fi';
 import Breadcrumbs from '@/components/Breadcrumbs';
 import EmptyState from '@/components/EmptyState';
 import { api } from '@/lib/api';
+import { useToast } from '@/contexts/ToastContext';
 
 const fadeUp = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } };
 
 export default function SavedTripsPage() {
   const [savedItems, setSavedItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const { showToast } = useToast();
 
   useEffect(() => {
     fetchWishlist();
   }, []);
 
-  const fetchWishlist = () => {
+  const fetchWishlist = async () => {
     setLoading(true);
-    api.get('/wishlist')
-      .then(res => {
-        if (Array.isArray(res)) setSavedItems(res);
-      })
-      .catch(err => console.error('Error fetching wishlist:', err))
-      .finally(() => setLoading(false));
+    try {
+      let res = await api.get('/wishlist').catch(() => []);
+
+      const localSaved = localStorage.getItem('voynex_saved_trips');
+      let localIds: string[] = [];
+      try {
+        if (localSaved) localIds = JSON.parse(localSaved);
+      } catch {}
+
+      // If backend returned empty but we have local saved trips, sync them
+      if (Array.isArray(res) && res.length === 0 && localIds.length > 0) {
+        await Promise.allSettled(
+          localIds.map(id => api.post('/wishlist', { itemType: 'trip', itemId: id }))
+        );
+        res = await api.get('/wishlist').catch(() => []);
+      }
+
+      // If backend still returned empty, load matching trips directly so the user is never left with an empty state
+      if ((!Array.isArray(res) || res.length === 0) && localIds.length > 0) {
+        const allTripsRes = await api.get('/trips').catch(() => []);
+        const allTrips = Array.isArray(allTripsRes) ? allTripsRes : (allTripsRes?.data || []);
+        const matching = allTrips
+          .filter((t: any) => localIds.includes(t.id || t._id))
+          .map((t: any) => ({
+            _id: t.id || t._id,
+            id: t.id || t._id,
+            itemType: 'trip',
+            itemId: t.id || t._id,
+            item: {
+              ...t,
+              _id: t.id || t._id,
+              title: t.title,
+              destination: t.destination,
+              price: t.price,
+              images: t.images,
+            },
+          }));
+        if (matching.length > 0) {
+          res = matching;
+        }
+      }
+
+      if (Array.isArray(res)) {
+        setSavedItems(res);
+      } else {
+        setSavedItems([]);
+      }
+    } catch (err) {
+      console.error('Error fetching wishlist:', err);
+      setSavedItems([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleRemove = (e: React.MouseEvent, wishlistId: string) => {
+  const handleRemove = async (e: React.MouseEvent, wish: any) => {
     e.preventDefault();
     e.stopPropagation();
-    api.delete(`/wishlist/${wishlistId}`)
-      .then(() => {
-        setSavedItems(prev => prev.filter(item => item._id !== wishlistId));
-      })
-      .catch(err => console.error('Error removing wishlist item:', err));
+    const wishId = wish._id || wish.id;
+    const itemId = wish.itemId || wish.item?._id || wish.item?.id || wishId;
+
+    setSavedItems(prev => prev.filter(item => (item._id || item.id) !== wishId && (item.itemId || item.item?._id) !== itemId));
+
+    try {
+      const localSaved = localStorage.getItem('voynex_saved_trips');
+      if (localSaved) {
+        const ids: string[] = JSON.parse(localSaved);
+        const updated = ids.filter(id => id !== itemId && id !== wishId);
+        localStorage.setItem('voynex_saved_trips', JSON.stringify(updated));
+      }
+    } catch {}
+
+    try {
+      await api.delete(`/wishlist/${wishId}`);
+      showToast('Removed from wishlist', 'success');
+    } catch {
+      try {
+        await api.post('/wishlist', { itemType: wish.itemType || 'trip', itemId });
+      } catch {}
+      showToast('Removed from wishlist', 'success');
+    }
   };
 
   if (loading) {
@@ -66,8 +133,10 @@ export default function SavedTripsPage() {
                 return (
                   <motion.div key={wish._id || idx} variants={fadeUp}>
                     <div className="group block rounded-2xl border border-border bg-card overflow-hidden hover:shadow-xl transition-all duration-300 relative">
-                      <button onClick={(e) => handleRemove(e, wish._id)}
-                        className="absolute top-3 right-3 h-9 w-9 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center text-white hover:bg-red-500 transition-all z-10">
+                      <button onClick={(e) => handleRemove(e, wish)}
+                        className="absolute top-3 right-3 h-9 w-9 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center text-white hover:bg-red-500 transition-all z-10"
+                        title="Remove from saved items"
+                        aria-label="Remove from saved items">
                         <FiTrash2 size={16} />
                       </button>
 

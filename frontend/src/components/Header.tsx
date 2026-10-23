@@ -53,9 +53,8 @@ export default function Header() {
         label: 'Plan My Trip',
         href: '/plan',
         children: [
-          { href: '/ai-planner', label: 'AI Planner', description: 'Generate personalized itineraries', icon: TbCpu },
+          { href: '/ai-planner', label: 'AI Planner', description: 'Generate personalized itineraries & packing checklist', icon: TbCpu },
           { href: '/freetime', label: 'Free-Time Finder', description: 'Nearby spots during layovers & station gaps', icon: TbClock },
-          { href: '/packing-assistant', label: 'Smart Packing', description: 'AI-powered packing checklists', icon: TbPackage },
           { href: '/chat', label: 'Available Travel Assistant', description: 'Chat with our AI travel expert', icon: TbMessageCircle },
         ],
       },
@@ -83,13 +82,11 @@ export default function Header() {
           ...(isAuthenticated
             ? [
                 { href: '/profile', label: 'Profile', description: 'Manage your personal details', icon: TbUser },
-                { href: '/settings', label: 'Settings', description: 'App preferences and billing', icon: TbSettings },
                 { href: '/membership', label: 'Membership', description: 'View and upgrade your plan', icon: TbCrown },
                 { href: '#', label: 'Logout', description: 'Sign out of your account', icon: TbLogout, onClick: logout },
               ]
             : [
                 { href: '/login', label: 'Login / Signup', description: 'Access your account', icon: TbUserPlus },
-                { href: '/settings', label: 'Settings', description: 'App preferences', icon: TbSettings },
                 { href: '/membership', label: 'Membership', description: 'View travel plans', icon: TbCrown },
               ]),
         ],

@@ -78,6 +78,13 @@ const BUDGET_TIERS = [
     range: '₹12,000+ / day',
     desc: '5-star resorts, private chauffeurs, VIP experiences & fine dining',
   },
+  {
+    id: 'Other',
+    label: 'Other',
+    amount: 25000,
+    range: 'Custom pricing',
+    desc: 'Specify your own target budget per day',
+  },
 ];
 
 const PROMPT_SUGGESTIONS = [
@@ -108,7 +115,9 @@ export default function AIPlannerPage() {
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [adults, setAdults] = useState(2);
   const [children, setChildren] = useState(0);
+  const [seniors, setSeniors] = useState(0);
   const [budgetTier, setBudgetTier] = useState('Moderate');
+  const [customBudgetPerDay, setCustomBudgetPerDay] = useState<string>('5000');
   const [selectedPreferences, setSelectedPreferences] = useState<string[]>([
     'Nature and mountains',
     'Food and local experiences',
@@ -149,8 +158,8 @@ export default function AIPlannerPage() {
 
   const handleApplySuggestion = (promptText: string) => {
     setCustomPrompt(promptText);
-    // Parse destination if recognized
-    for (const d of POPULAR_DESTINATIONS) {
+    const commonSpots = ['Manali', 'Bali', 'Goa', 'Paris', 'Kyoto', 'Ladakh', 'Swiss Alps', 'Dubai'];
+    for (const d of commonSpots) {
       if (promptText.toLowerCase().includes(d.toLowerCase())) {
         setDestination(d);
         break;
@@ -169,21 +178,31 @@ export default function AIPlannerPage() {
     setLoadingStep(0);
 
     const activeTier = BUDGET_TIERS.find((b) => b.id === budgetTier) || BUDGET_TIERS[1];
-    const totalTravellers = adults + children;
+    const totalTravellers = adults + children + seniors;
+    const dailyCustom = Math.max(500, Number(customBudgetPerDay) || 5000);
+    const baseBudget = budgetTier === 'Other' ? dailyCustom * Number(duration) : activeTier.amount;
+    const finalBudget = Math.round(baseBudget * (totalTravellers > 1 ? 1 + (totalTravellers - 1) * 0.5 : 1));
 
     try {
       const interestsPayload = selectedPreferences.length > 0
         ? selectedPreferences
         : ['Adventurous', 'Relaxing'];
 
+      const seniorNote = seniors > 0
+        ? [`Group includes ${seniors} senior citizen(s) - pace accordingly with comfortable transit and accessible stops`]
+        : [];
+      const customBudgetNote = budgetTier === 'Other'
+        ? [`Target Budget: ₹${dailyCustom.toLocaleString('en-IN')}/day`]
+        : [];
+
       // Send prompt context if provided
       const res = await api.post('/ai/plan-trip', {
         destination: destination.trim(),
         duration: Number(duration),
-        budget: activeTier.amount * (totalTravellers > 1 ? 1 + (totalTravellers - 1) * 0.5 : 1),
+        budget: finalBudget,
         interests: customPrompt
-          ? [...interestsPayload, `Special Request: ${customPrompt}`]
-          : interestsPayload,
+          ? [...interestsPayload, ...seniorNote, ...customBudgetNote, `Special Request: ${customPrompt}`]
+          : [...interestsPayload, ...seniorNote, ...customBudgetNote],
         startDate: startDate || new Date().toISOString().split('T')[0],
       });
 
@@ -300,28 +319,6 @@ export default function AIPlannerPage() {
                         <TbInfoCircle className="w-4 h-4" /> {validationError}
                       </p>
                     )}
-
-                    {/* Popular Destination Quick Chips */}
-                    <div className="flex flex-wrap items-center gap-1.5 pt-2">
-                      <span className="text-[11px] font-bold text-[#697773] uppercase tracking-wider mr-1">Popular:</span>
-                      {POPULAR_DESTINATIONS.map((pop) => (
-                        <button
-                          key={pop}
-                          type="button"
-                          onClick={() => {
-                            setDestination(pop);
-                            if (validationError) setValidationError(null);
-                          }}
-                          className={`text-xs px-3 py-1.5 rounded-full border transition-all ${
-                            destination.toLowerCase() === pop.toLowerCase()
-                              ? 'bg-[#176B55] text-white border-[#176B55] font-bold shadow-sm'
-                              : 'bg-[#F7F7F2] text-[#172B2A] border-[#E5E9E5] hover:border-[#176B55]/50'
-                          }`}
-                        >
-                          {pop}
-                        </button>
-                      ))}
-                    </div>
                   </div>
                 </div>
 
@@ -333,14 +330,14 @@ export default function AIPlannerPage() {
                     </div>
                     <div>
                       <h2 className="text-base sm:text-lg font-bold text-[#172B2A]">2. Duration & Travellers</h2>
-                      <p className="text-xs text-[#697773]">Set your schedule and party size</p>
+                      <p className="text-xs text-[#697773]">Set your schedule and party composition</p>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
                     
                     {/* Duration Counter */}
-                    <div className="space-y-2">
+                    <div className="sm:col-span-3 space-y-2">
                       <label className="block text-xs font-bold uppercase tracking-wider text-[#697773]">
                         Trip Duration
                       </label>
@@ -366,7 +363,7 @@ export default function AIPlannerPage() {
                     </div>
 
                     {/* Start Date */}
-                    <div className="space-y-2">
+                    <div className="sm:col-span-3 space-y-2">
                       <label className="block text-xs font-bold uppercase tracking-wider text-[#697773]">
                         Departure Date
                       </label>
@@ -379,62 +376,89 @@ export default function AIPlannerPage() {
                       />
                     </div>
 
-                    {/* Travellers Picker */}
-                    <div className="space-y-2">
+                    {/* Travellers Picker: Adults, Kids, Seniors */}
+                    <div className="sm:col-span-6 space-y-2">
                       <label className="block text-xs font-bold uppercase tracking-wider text-[#697773]">
                         Travellers
                       </label>
-                      <div className="flex items-center justify-between bg-[#F7F7F2] border border-[#E5E9E5] rounded-2xl px-3 h-[52px] text-xs">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[#697773] font-medium">Adults:</span>
+                      <div className="flex items-center justify-between bg-[#F7F7F2] border border-[#E5E9E5] rounded-2xl px-2.5 sm:px-3 h-[52px] text-xs">
+                        {/* Adults */}
+                        <div className="flex items-center gap-1">
+                          <span className="text-[#697773] font-medium text-[11px] sm:text-xs">Adults:</span>
                           <span className="font-bold text-[#172B2A]">{adults}</span>
-                          <div className="flex flex-col ml-1">
+                          <div className="flex flex-col ml-0.5">
                             <button
                               type="button"
                               onClick={() => setAdults((a) => Math.min(10, a + 1))}
                               className="text-[#176B55] hover:opacity-80"
                             >
-                              <TbPlus className="w-3 h-3" />
+                              <TbPlus className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                             </button>
                             <button
                               type="button"
                               onClick={() => setAdults((a) => Math.max(1, a - 1))}
                               className="text-[#697773] hover:text-[#172B2A]"
                             >
-                              <TbMinus className="w-3 h-3" />
+                              <TbMinus className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                             </button>
                           </div>
                         </div>
 
-                        <div className="w-px h-6 bg-[#E5E9E5]" />
+                        <div className="w-px h-5 bg-[#E5E9E5]" />
 
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[#697773] font-medium">Kids:</span>
+                        {/* Kids */}
+                        <div className="flex items-center gap-1">
+                          <span className="text-[#697773] font-medium text-[11px] sm:text-xs">Kids:</span>
                           <span className="font-bold text-[#172B2A]">{children}</span>
-                          <div className="flex flex-col ml-1">
+                          <div className="flex flex-col ml-0.5">
                             <button
                               type="button"
                               onClick={() => setChildren((c) => Math.min(8, c + 1))}
                               className="text-[#176B55] hover:opacity-80"
                             >
-                              <TbPlus className="w-3 h-3" />
+                              <TbPlus className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                             </button>
                             <button
                               type="button"
                               onClick={() => setChildren((c) => Math.max(0, c - 1))}
                               className="text-[#697773] hover:text-[#172B2A]"
                             >
-                              <TbMinus className="w-3 h-3" />
+                              <TbMinus className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                             </button>
                           </div>
                         </div>
+
+                        <div className="w-px h-5 bg-[#E5E9E5]" />
+
+                        {/* Senior Citizens */}
+                        <div className="flex items-center gap-1">
+                          <span className="text-[#697773] font-medium text-[11px] sm:text-xs">Seniors:</span>
+                          <span className="font-bold text-[#172B2A]">{seniors}</span>
+                          <div className="flex flex-col ml-0.5">
+                            <button
+                              type="button"
+                              onClick={() => setSeniors((s) => Math.min(8, s + 1))}
+                              className="text-[#176B55] hover:opacity-80"
+                            >
+                              <TbPlus className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setSeniors((s) => Math.max(0, s - 1))}
+                              className="text-[#697773] hover:text-[#172B2A]"
+                            >
+                              <TbMinus className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                            </button>
+                          </div>
+                        </div>
+
                       </div>
                     </div>
 
                   </div>
                 </div>
 
-                {/* 2C: Budget Selection */}
+                {/* 2C: Budget Selection with Other (Custom price) */}
                 <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#E5E9E5] shadow-sm space-y-5">
                   <div className="flex items-center gap-2.5 border-b border-[#E5E9E5] pb-4">
                     <div className="p-2 rounded-xl bg-[#176B55]/10 text-[#176B55]">
@@ -442,35 +466,62 @@ export default function AIPlannerPage() {
                     </div>
                     <div>
                       <h2 className="text-base sm:text-lg font-bold text-[#172B2A]">3. Budget Style</h2>
-                      <p className="text-xs text-[#697773]">Select your preferred spending comfort</p>
+                      <p className="text-xs text-[#697773]">Select your preferred spending comfort or specify a custom price</p>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
                     {BUDGET_TIERS.map((tier) => {
                       const isSelected = budgetTier === tier.id;
+                      const isOther = tier.id === 'Other';
                       return (
-                        <button
+                        <div
                           key={tier.id}
-                          type="button"
                           onClick={() => setBudgetTier(tier.id)}
-                          className={`p-4 rounded-2xl border text-left transition-all relative ${
+                          className={`p-4 rounded-2xl border text-left transition-all relative cursor-pointer flex flex-col justify-between ${
                             isSelected
-                              ? 'border-[#176B55] bg-[#176B55]/5 shadow-sm'
+                              ? 'border-[#176B55] bg-[#176B55]/5 shadow-sm ring-1 ring-[#176B55]'
                               : 'border-[#E5E9E5] bg-white hover:border-[#697773]/40'
                           }`}
                         >
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="font-bold text-sm text-[#172B2A]">{tier.label}</span>
-                            {isSelected && (
-                              <span className="w-5 h-5 rounded-full bg-[#176B55] text-white flex items-center justify-center">
-                                <TbCheck className="w-3.5 h-3.5" />
-                              </span>
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="font-bold text-sm text-[#172B2A]">{tier.label}</span>
+                              {isSelected && (
+                                <span className="w-5 h-5 rounded-full bg-[#176B55] text-white flex items-center justify-center">
+                                  <TbCheck className="w-3.5 h-3.5" />
+                                </span>
+                              )}
+                            </div>
+                            
+                            {!isOther ? (
+                              <div className="text-xs font-extrabold text-[#176B55] mt-0.5">{tier.range}</div>
+                            ) : (
+                              <div className="mt-1">
+                                <div className="text-[11px] font-bold text-[#176B55] mb-1">Custom Price:</div>
+                                <div className="relative" onClick={(e) => e.stopPropagation()}>
+                                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-[#176B55]">₹</span>
+                                  <input
+                                    type="number"
+                                    min={500}
+                                    step={500}
+                                    value={customBudgetPerDay}
+                                    onFocus={() => setBudgetTier('Other')}
+                                    onChange={(e) => {
+                                      setCustomBudgetPerDay(e.target.value);
+                                      if (budgetTier !== 'Other') setBudgetTier('Other');
+                                    }}
+                                    placeholder="5000"
+                                    className="w-full pl-6 pr-10 py-1.5 rounded-xl border border-[#176B55]/60 bg-white text-xs font-bold text-[#172B2A] focus:outline-none focus:ring-1 focus:ring-[#176B55]"
+                                  />
+                                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-[#697773] font-medium">/day</span>
+                                </div>
+                              </div>
                             )}
+
+                            <p className="text-[11px] text-[#697773] mt-2 leading-relaxed">{tier.desc}</p>
                           </div>
-                          <div className="text-xs font-extrabold text-[#176B55] mt-0.5">{tier.range}</div>
-                          <p className="text-[11px] text-[#697773] mt-2 leading-relaxed">{tier.desc}</p>
-                        </button>
+                        </div>
                       );
                     })}
                   </div>
@@ -624,11 +675,17 @@ export default function AIPlannerPage() {
                       </div>
                       <div className="flex items-center justify-between py-1">
                         <span className="text-[#697773]">Party:</span>
-                        <span className="font-bold text-[#172B2A]">{adults + children} Travellers</span>
+                        <span className="font-bold text-[#172B2A]">
+                          {adults + children + seniors} {adults + children + seniors === 1 ? 'Traveller' : 'Travellers'}
+                        </span>
                       </div>
                       <div className="flex items-center justify-between py-1">
                         <span className="text-[#697773]">Budget Comfort:</span>
-                        <span className="font-bold text-[#176B55]">{budgetTier}</span>
+                        <span className="font-bold text-[#176B55]">
+                          {budgetTier === 'Other'
+                            ? `Custom (₹${Number(customBudgetPerDay || 5000).toLocaleString('en-IN')}/day)`
+                            : budgetTier}
+                        </span>
                       </div>
                     </div>
 
@@ -771,7 +828,7 @@ export default function AIPlannerPage() {
                         destination,
                         durationDays: Number(duration),
                         budget: budgetTier,
-                        travelers: String(adults + children),
+                        travelers: String(adults + children + seniors),
                         itinerary: { text: aiPlan },
                       })
                         .then(() => {
@@ -820,9 +877,9 @@ export default function AIPlannerPage() {
                   <div className="flex flex-wrap items-center gap-4 text-xs font-medium text-white/80 pt-1">
                     <span>{duration} Days Trip</span>
                     <span>&bull;</span>
-                    <span>{budgetTier} Comfort</span>
+                    <span>{budgetTier === 'Other' ? `₹${Number(customBudgetPerDay || 5000).toLocaleString('en-IN')}/day` : budgetTier}</span>
                     <span>&bull;</span>
-                    <span>{adults + children} Travellers</span>
+                    <span>{adults + children + seniors} Travellers</span>
                   </div>
                 </div>
               </div>
@@ -832,7 +889,7 @@ export default function AIPlannerPage() {
                 itineraryText={aiPlan}
                 destination={destination}
                 duration={duration}
-                budget={budgetTier}
+                budget={budgetTier === 'Other' ? `₹${Number(customBudgetPerDay || 5000).toLocaleString('en-IN')}/day` : budgetTier}
                 vibe={selectedPreferences.join(', ')}
               />
             </motion.div>

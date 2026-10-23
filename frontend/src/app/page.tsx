@@ -8,6 +8,7 @@ import {
   TbShoppingBag, TbPackage, TbSearch, TbTrendingUp, TbGlobe, TbClock, TbCurrencyRupee
 } from 'react-icons/tb';
 import { api } from '@/lib/api';
+import { getDestinationImage } from '@/lib/destinationImages';
 
 const fadeUp = { hidden: { opacity: 0, y: 30 }, visible: { opacity: 1, y: 0 } };
 
@@ -310,7 +311,16 @@ export default function HomePage() {
                 {recentlyViewed.slice(0, 3).map((trip, idx) => (
                   <motion.div key={trip._id || idx} variants={fadeUp} className="flex-shrink-0 w-72">
                     <div className="group flex items-center p-3 rounded-2xl border border-border bg-card hover:shadow-card-hover transition-all">
-                      <div className="h-16 w-16 rounded-xl bg-surface mr-3 flex-shrink-0" />
+                      <div className="h-16 w-16 rounded-xl bg-surface mr-3 flex-shrink-0 overflow-hidden relative">
+                        <img
+                          src={(Array.isArray(trip.images) && trip.images[0]) ? trip.images[0] : (typeof trip.images === 'string' && trip.images) ? trip.images : getDestinationImage(trip.destination || trip.title)}
+                          alt={trip.title}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = getDestinationImage(trip.destination || trip.title);
+                          }}
+                        />
+                      </div>
                       <div className="flex-1 min-w-0 pr-2">
                         <h4 className="font-bold text-sm truncate group-hover:text-accent transition-colors">{trip.title}</h4>
                         <p className="text-xs text-muted mb-2 truncate">{trip.destination}</p>
@@ -340,15 +350,27 @@ export default function HomePage() {
             </motion.div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {featuredTrips.map((trip, idx) => (
-                <motion.div key={trip._id} variants={fadeUp}>
-                  <Link href={`/trips/${trip._id}`} className="group flex flex-col h-full rounded-2xl border border-border bg-card overflow-hidden hover:shadow-card-hover hover:-translate-y-1 transition-all duration-300">
-                    <div className="relative aspect-video overflow-hidden img-dark-overlay">
-                      <div className={`absolute inset-0 bg-gradient-to-br ${
-                        ['from-blue-400 to-purple-600', 'from-orange-400 to-pink-500', 'from-teal-400 to-emerald-600', 'from-rose-400 to-red-500'][idx % 4]
-                      }`} />
-                      <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-all duration-500" />
-                    </div>
+              {featuredTrips.map((trip, idx) => {
+                const tripImg = (Array.isArray(trip.images) && trip.images[0])
+                  ? trip.images[0]
+                  : (typeof trip.images === 'string' && trip.images)
+                  ? trip.images
+                  : getDestinationImage(trip.destination || trip.title);
+
+                return (
+                  <motion.div key={trip._id} variants={fadeUp}>
+                    <Link href={`/trips/${trip._id}`} className="group flex flex-col h-full rounded-2xl border border-border bg-card overflow-hidden hover:shadow-card-hover hover:-translate-y-1 transition-all duration-300">
+                      <div className="relative aspect-video overflow-hidden bg-slate-900">
+                        <img
+                          src={tripImg}
+                          alt={trip.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = getDestinationImage(trip.destination || trip.title);
+                          }}
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
+                      </div>
 
                     <div className="p-6 flex flex-col flex-1">
                       <h3 className="font-bold text-xl mb-4 group-hover:text-accent transition-colors line-clamp-1">{trip.title}</h3>
@@ -386,7 +408,8 @@ export default function HomePage() {
                     </div>
                   </Link>
                 </motion.div>
-              ))}
+              );
+            })}
             </div>
             
             <div className="mt-8 text-center sm:hidden">

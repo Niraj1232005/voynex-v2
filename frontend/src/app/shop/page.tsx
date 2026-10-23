@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { FiShoppingCart, FiStar, FiSearch, FiPackage } from 'react-icons/fi';
+import { FiShoppingCart, FiStar, FiSearch, FiPackage, FiMinus, FiPlus } from 'react-icons/fi';
 import { useCart } from '@/contexts/CartContext';
 import Breadcrumbs from '@/components/Breadcrumbs';
 import { api } from '@/lib/api';
@@ -14,7 +14,7 @@ export default function ShopPage() {
   const [category, setCategory] = useState('all');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
-  const { addToCart } = useCart();
+  const { addToCart, updateQuantity, getItemQuantity } = useCart();
   const [addedId, setAddedId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -118,15 +118,48 @@ export default function ShopPage() {
 
                 <div className="p-5 pt-0 flex items-center justify-between border-t border-border/60 mt-2">
                   <span className="text-xl font-black text-foreground">₹{(product.price || 0).toLocaleString()}</span>
-                  <button onClick={() => handleAdd(product)}
-                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
-                      addedId === (product._id || product.id)
-                        ? 'bg-emerald-600 text-white'
-                        : 'bg-primary text-primary-foreground hover:bg-primary/90'
-                    }`}>
-                    <FiShoppingCart size={14} />
-                    {addedId === (product._id || product.id) ? 'Added!' : 'Add to Cart'}
-                  </button>
+                  {(() => {
+                    const pId = product._id || product.id;
+                    const qty = getItemQuantity(pId);
+                    return qty > 0 ? (
+                      <div className="flex items-center rounded-xl border border-primary/30 bg-primary/10 p-1 gap-1.5 shadow-xs">
+                        <button
+                          type="button"
+                          onClick={() => updateQuantity(pId, qty - 1)}
+                          className="h-7 w-7 rounded-lg bg-card border border-border flex items-center justify-center text-foreground hover:bg-muted font-bold transition-all active:scale-95"
+                          title="Decrease quantity (-1)"
+                          aria-label="Decrease quantity"
+                        >
+                          <FiMinus size={13} />
+                        </button>
+                        <span className="font-mono font-bold text-xs text-primary min-w-[20px] text-center">
+                          {qty}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => updateQuantity(pId, qty + 1)}
+                          className="h-7 w-7 rounded-lg bg-primary text-primary-foreground flex items-center justify-center font-bold hover:bg-primary/90 transition-all active:scale-95"
+                          title="Increase quantity (+1)"
+                          aria-label="Increase quantity"
+                        >
+                          <FiPlus size={13} />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleAdd(product)}
+                        className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                          addedId === pId
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                        }`}
+                      >
+                        <FiShoppingCart size={14} />
+                        {addedId === pId ? 'Added!' : 'Add to Cart'}
+                      </button>
+                    );
+                  })()}
                 </div>
               </motion.div>
             ))}

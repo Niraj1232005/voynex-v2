@@ -26,27 +26,27 @@ const subFeatures = [
     href: '/ai-planner',
     icon: TbWand,
     badge: 'Most Popular',
-    title: 'AI Trip Planner',
-    tagline: 'Custom Day-by-Day Itineraries in Seconds',
+    title: 'AI Trip & Packing Planner',
+    tagline: 'Custom Day-by-Day Itineraries & Smart Packing in Seconds',
     description:
-      'Describe your dream destination, budget, and travel vibe. Our AI synthesizes daily activities, realistic travel timings, and hidden gems.',
+      'Describe your dream destination, budget, and travel vibe. Our AI synthesizes daily activities, budget breakdowns, and an automated packing checklist.',
     imageUrl:
       'https://images.unsplash.com/photo-1506197603052-3cc9c3a201bd?w=1200&auto=format&fit=crop&q=80',
-    highlights: ['Bespoke day-to-evening routes', 'Budget tier calculations', 'One-click PDF download'],
+    highlights: ['Bespoke day-to-evening routes', 'Estimated budget breakdown', 'Integrated Smart Packing list'],
     ctaText: 'Launch AI Trip Planner',
   },
   {
-    href: '/packing-assistant',
-    icon: TbBriefcase,
-    badge: 'Smart Assistant',
-    title: 'Smart Packing Assistant',
-    tagline: 'Personalized Checklist for Your Voyage',
+    href: '/freetime',
+    icon: TbClock,
+    badge: 'Smart Discovery',
+    title: 'Free-Time Finder',
+    tagline: 'Make the Most of Layovers & Gaps',
     description:
-      'Never leave essentials behind. Automatically generates packing lists tailored to your destination weather, trip length, and planned activities.',
+      'Discover high-rated cafes, historic landmarks, and quick sightseeing spots within minutes of your station or airport during layovers.',
     imageUrl:
       'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=1200&auto=format&fit=crop&q=80',
-    highlights: ['Weather-aware suggestions', 'Categorized gear checklists', 'Mobile interactive ticks'],
-    ctaText: 'Open Packing Assistant',
+    highlights: ['Transit-friendly spots', 'Precise distance & timing', 'Turn downtime into adventure'],
+    ctaText: 'Explore Free-Time Finder',
   },
 ];
 

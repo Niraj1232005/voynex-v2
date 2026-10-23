@@ -70,11 +70,12 @@ Please format the response nicely in Markdown with clear headings:
 (Provide detailed morning, afternoon, and evening activities for Day 1 through Day ${duration})
 
 ## 💰 Realistic Budget Breakdown
-- Accommodation: ...
-- Food & Dining: ...
-- Transport & Sightseeing: ...
-- Buffer/Emergency: ...
-- Total: Approx ${budget} INR
+- **Accommodation**: [Estimated total in INR] (e.g. boutique stays or homestays)
+- **Food & Dining**: [Estimated total in INR] (e.g. daily meals, street food & cafes)
+- **Transport & Sightseeing**: [Estimated total in INR] (e.g. cabs, rentals, transfers)
+- **Activities & Experiences**: [Estimated total in INR] (e.g. permits & entry tickets)
+- **Buffer / Emergency**: [Estimated total in INR]
+- **Estimated Total**: Approx ₹${budget.toLocaleString('en-IN')} INR
 
 ## 🎒 Essential Packing Checklist
 - Specific essentials for this destination and season
